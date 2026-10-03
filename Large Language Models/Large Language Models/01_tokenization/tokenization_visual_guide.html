@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tokenization in LLMs: a visual guide</title>
+<style>
+:root{--bg:#eef2f7;--ink:#0f1b2d;--mut:#51607a;--card:#fff;--line:#d5dce8;--acc:#2f5bea;--tb:86%;--ts:75%;--tc:#10203a}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1522;--ink:#e8eefb;--mut:#9bacc8;--card:#162033;--line:#27344d;--acc:#7aa2ff;--tb:30%;--ts:40%;--tc:#eaf0ff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2,h3{font-family:"Iowan Old Style",Georgia,serif;line-height:1.2;margin:0 0 .5em}
+h1{font-size:clamp(2.2rem,6vw,3.6rem)}h2{font-size:1.8rem}h3{font-size:1.15rem}
+main{max-width:980px;margin:auto;padding:0 20px 60px}
+section{margin-top:56px}
+p{max-width:70ch}.mut{color:var(--mut)}
+nav{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);z-index:5;overflow-x:auto;white-space:nowrap;padding:8px 20px}
+nav a{color:var(--mut);text-decoration:none;margin-right:18px;font-size:.92rem}nav a:hover{color:var(--acc)}
+a{color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.t{display:inline-flex;flex-direction:column;align-items:center;margin:3px;padding:4px 9px;border-radius:5px;background:hsl(var(--h) var(--ts) var(--tb));color:var(--tc);font:600 1rem ui-monospace,Consolas,monospace;white-space:pre}
+.t small{font:.62rem ui-monospace,monospace;opacity:.75}
+.hero{padding:56px 0 8px}
+.hero .row{margin:18px 0;min-height:70px}
+.hero .t{animation:pop .5s both}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.9)}}
+@media(prefers-reduced-motion:reduce){.hero .t{animation:none}}
+textarea,button{font:inherit}
+textarea{width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);min-height:70px}
+button{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;margin:3px 3px 3px 0}
+button:hover,button.on{border-color:var(--acc);color:var(--acc)}
+button:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.bar{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:.9rem}
+.bar b{width:130px;flex:none;font-weight:600}.bar i{display:block;height:20px;background:var(--acc);border-radius:4px;min-width:3px;transition:width .3s}
+.bar span{color:var(--mut)}
+.flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+.flow .s{flex:1 1 120px;position:relative}
+.flow .s:not(:last-child)::after{content:"\2192";position:absolute;right:-13px;top:14px;color:var(--acc);font-size:1.2rem}
+.flow code{display:block;margin-top:8px;font-size:.78rem;word-break:break-word}
+table{border-collapse:collapse;width:100%;font-size:.93rem}th,td{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
+code,pre{font-family:ui-monospace,Consolas,monospace}
+pre{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;overflow-x:auto;font-size:.84rem;line-height:1.5}
+details{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:8px 0}summary{cursor:pointer;font-weight:600}
+ul.l{padding-left:20px}ul.l li{margin:6px 0}
+.svgw{overflow-x:auto}
+</style></head><body>
+<nav><a href="#lab">Try it live</a><a href="#why">Why subwords</a><a href="#bpe">BPE step by step</a><a href="#flow">Full pipeline</a><a href="#algos">Algorithms</a><a href="#matters">Why it matters</a><a href="#code">Code</a><a href="#check">Self-check</a><a href="#links">Links</a></nav>
+<main>
+<header class="hero">
+<h1>How an LLM reads: tokenization</h1>
+<p class="mut">A language model cannot read letters. It reads numbers. Tokenization is the step that turns your text into those numbers, and back again.</p>
+<div class="row" id="h1"></div>
+<div class="row" id="h2"></div>
+<p class="mut">The colored tiles are tokens; the small numbers are their IDs. This page uses a small toy tokenizer so you can see the idea. Real models use the same method with a vocabulary of tens of thousands of tokens.</p>
+</header>
+
+<section id="lab"><h2>Try it live: three ways to cut text</h2>
+<p>Type anything, including Hindi or Gujarati, and compare how many pieces each method creates.</p>
+<textarea id="in" aria-label="Text to tokenize">Tokenization is fun</textarea>
+<div id="pre"></div>
+<div class="card" style="margin-top:12px"><b>Characters</b><div id="o1"></div></div>
+<div class="card" style="margin-top:10px"><b>Words</b><div id="o2"></div></div>
+<div class="card" style="margin-top:10px"><b>Toy subword (BPE)</b> <span class="mut">(▁ marks a space before a word)</span><div id="o3"></div></div>
+<div class="card" style="margin-top:10px"><h3>Pieces created</h3><div id="bars"></div>
+<p class="mut" style="margin-bottom:0">Characters: tiny vocabulary, long sequences. Words: short sequences, huge vocabulary, and new words break it. Subwords sit in between. Notice how text the toy vocabulary has never seen (like Hindi) falls back to single characters: the same thing makes non-English text costlier in real models.</p></div>
+</section>
+
+<section id="why"><h2>Why subwords win</h2>
+<div class="grid">
+<div class="card"><h3>Word-level</h3><p>Short sequences and easy to read. But the vocabulary is huge, and an unknown word like "ChatGPTify" has no entry at all.</p></div>
+<div class="card"><h3>Character-level</h3><p>Tiny vocabulary and nothing is unknown. But sequences get very long and the model must learn spelling before it learns meaning.</p></div>
+<div class="card"><h3>Subword (used by LLMs)</h3><p>Common words stay whole. Rare words split into reusable pieces: "unbelievable" becomes "un", "believ", "able".</p></div></div>
+<div class="card svgw" style="margin-top:14px"><h3>The trade-off (conceptual sketch)</h3>
+<svg viewBox="0 0 520 220" width="100%" role="img" aria-label="As vocabulary size grows, sequence length falls while embedding table size rises">
+<line x1="40" y1="190" x2="500" y2="190" stroke="currentColor" opacity=".4"/><line x1="40" y1="20" x2="40" y2="190" stroke="currentColor" opacity=".4"/>
+<path d="M40 40 C120 120 220 165 500 180" fill="none" stroke="#e0533d" stroke-width="3"/>
+<path d="M40 180 C200 170 330 120 500 30" fill="none" stroke="#2f7de0" stroke-width="3"/>
+<rect x="215" y="20" width="90" height="170" fill="#2fb36b" opacity=".13"/>
+<text x="260" y="40" text-anchor="middle" font-size="12" fill="currentColor">sweet spot</text>
+<text x="46" y="36" font-size="12" fill="#e0533d">sequence length</text><text x="400" y="26" font-size="12" fill="#2f7de0">embedding table size</text>
+<text x="270" y="210" text-anchor="middle" font-size="12" fill="currentColor">vocabulary size →</text>
+<text x="44" y="204" font-size="11" fill="currentColor">characters</text><text x="455" y="204" font-size="11" fill="currentColor">whole words</text></svg>
+<p class="mut" style="margin:0">A bigger vocabulary shortens sequences but grows the embedding table. Real LLMs pick a middle value, commonly tens of thousands to a couple of hundred thousand tokens.</p></div>
+</section>
+
+<section id="bpe"><h2>BPE step by step</h2>
+<p>Byte Pair Encoding builds its vocabulary by repeatedly merging the most frequent neighbouring pair. Press <b>Merge</b> and watch it learn from a tiny corpus (the counts are word frequencies).</p>
+<div class="card"><div id="bw"></div>
+<div class="grid" style="margin-top:12px"><div><b>Pair counts</b><div id="bp"></div></div><div><b>Merges learned</b><div id="bm" class="mut">none yet</div><p class="mut" id="bv"></p></div></div>
+<button id="nx" class="on">Merge most frequent pair</button><button id="rs">Reset</button></div>
+<p class="mut">The rule: 1) start with characters, 2) count adjacent pairs, 3) merge the most frequent, 4) repeat until the vocabulary reaches the size you want. Frequent chunks like "est" and "low" become single tokens.</p>
+</section>
+
+<section id="flow"><h2>The full pipeline: text to model</h2>
+<div class="flow">
+<div class="card s"><b>Raw text</b><code>"Hello world!"</code></div>
+<div class="card s"><b>Normalize</b><code>clean Unicode, optional lowercase</code></div>
+<div class="card s"><b>Pre-tokenize</b><code>split on spaces and punctuation</code></div>
+<div class="card s"><b>Subword split</b><code>["Hello", " world", "!"]</code></div>
+<div class="card s"><b>Token IDs</b><code>[15496, 995, 0]</code></div>
+<div class="card s"><b>Embedding lookup</b><code>each ID becomes a vector of numbers</code></div>
+<div class="card s"><b>Model</b><code>processes vectors, predicts the next token ID</code></div></div>
+<p class="mut">Example IDs come from the GPT-2 tokenizer; other models use different vocabularies and give different IDs. After generation, the output IDs are decoded back to text.</p>
+</section>
+
+<section id="algos"><h2>The main algorithms</h2>
+<div class="grid">
+<div class="card"><h3>BPE</h3><p>Merges the most frequent pair, repeatedly. Used in the GPT family (GPT-2 onward uses a byte-level version).</p></div>
+<div class="card"><h3>WordPiece</h3><p>Like BPE, but picks merges that best improve the likelihood of the training data. Used by BERT; continuation pieces start with <code>##</code>.</p></div>
+<div class="card"><h3>SentencePiece</h3><p>Works on raw text and treats the space as a symbol (▁), so it is language-independent. Offers BPE or Unigram. Used by T5 and early LLaMA models.</p></div>
+<div class="card"><h3>Byte-level BPE</h3><p>Starts from bytes, so any character in any language can be encoded and nothing is ever "unknown".</p></div></div>
+<div class="card" style="margin-top:14px"><b>Special tokens</b> are reserved entries with a job, such as start of text, end of text, padding, or chat role markers. Using the wrong ones with a model is a quiet way to get bad results.</div>
+</section>
+
+<section id="matters"><h2>Why it matters in practice</h2>
+<div class="grid">
+<div class="card"><h3>Cost and limits</h3><p>APIs bill per token and context windows are counted in tokens. A common rule of thumb is about 4 characters, or roughly ¾ of an English word, per token.</p></div>
+<div class="card"><h3>Languages</h3><p>Text in languages that were less common in the training data often needs more tokens per word, so it costs more and fills the context faster. Measure it with a real tokenizer.</p></div>
+<div class="card"><h3>Odd behaviour</h3><p>The model sees chunks, not letters. That is why counting letters in a word, reversing strings or long exact arithmetic can go wrong.</p></div>
+<div class="card"><h3>Spaces and case</h3><p><code>"hello"</code>, <code>" hello"</code> and <code>"Hello"</code> are different tokens with different IDs.</p></div></div>
+<p><b>Always use the tokenizer that matches your model.</b> Another model's vocabulary maps IDs to different pieces.</p>
+</section>
+
+<section id="code"><h2>Run it yourself</h2>
+<pre>pip install tiktoken transformers
+
+import tiktoken
+enc = tiktoken.get_encoding("cl100k_base")
+ids = enc.encode("Tokenization is fun")
+print(ids, [enc.decode([i]) for i in ids], len(ids))
+
+from transformers import AutoTokenizer
+tok = AutoTokenizer.from_pretrained("bert-base-uncased")
+print(tok.tokenize("unbelievably"))   # WordPiece pieces, some start with ##</pre>
+<p class="mut">Exercise: encode the same sentence in English, Hindi and Gujarati and compare the counts.</p>
+</section>
+
+<section id="check"><h2>Self-check</h2>
+<details><summary>Why not just use whole words?</summary>The vocabulary becomes enormous and any unseen word cannot be represented. Subwords build rare words from reusable pieces.</details>
+<details><summary>What does BPE merge at each step?</summary>The most frequent pair of adjacent tokens in the training text, until the vocabulary reaches the target size.</details>
+<details><summary>Why can LLMs struggle with letter counting?</summary>They receive tokens (chunks of characters), not individual letters, so spelling is not directly visible to them.</details>
+<details><summary>Can you swap tokenizers between models?</summary>No. The model was trained on one vocabulary; a different one maps IDs to different text.</details>
+<details><summary>Key takeaways</summary>Tokens are numbers for text pieces. Subwords balance vocabulary size and sequence length. Tokens set your cost and context limit. Always match tokenizer to model.</details>
+</section>
+
+<section id="links"><h2>Go deeper (all open in a new tab)</h2>
+<div class="grid">
+<div class="card"><h3>Play with real tokenizers</h3><ul class="l">
+<li><a href="https://tiktokenizer.vercel.app/" target="_blank" rel="noopener">tiktokenizer</a>: paste text, see live token boundaries and IDs</li>
+<li><a href="https://animatedllm.github.io" target="_blank" rel="noopener">AnimatedLLM</a>: browser animations of tokenization, attention and generation</li>
+<li><a href="https://bbycroft.net/llm" target="_blank" rel="noopener">LLM Visualization</a>: 3D walkthrough of a transformer</li></ul></div>
+<div class="card"><h3>Read and build</h3><ul class="l">
+<li><a href="https://huggingface.co/course/chapter6/4" target="_blank" rel="noopener">Hugging Face course: normalization and pre-tokenization</a></li>
+<li><a href="https://huggingface.co/learn/llm-course/chapter6/8" target="_blank" rel="noopener">Hugging Face course: build WordPiece, BPE or Unigram</a></li>
+<li><a href="https://huggingface.co/course/chapter6/7" target="_blank" rel="noopener">Hugging Face course: Unigram tokenization</a></li></ul></div>
+<div class="card"><h3>Open-source code</h3><ul class="l">
+<li><a href="https://github.com/karpathy/minbpe" target="_blank" rel="noopener">karpathy/minbpe</a>: minimal, readable BPE; best repo to study</li>
+<li><a href="https://github.com/openai/tiktoken" target="_blank" rel="noopener">openai/tiktoken</a>: fast BPE tokenizer used with OpenAI models</li>
+<li><a href="https://github.com/google/sentencepiece" target="_blank" rel="noopener">google/sentencepiece</a>: train your own SentencePiece tokenizer</li>
+<li><a href="https://github.com/VPanjeta/LLM-MRI" target="_blank" rel="noopener">LLM-MRI</a>: compare BPE and WordPiece splits side by side</li></ul></div></div>
+<p class="mut">Also worth watching: Andrej Karpathy's lecture "Let's build the GPT Tokenizer" (search the title on YouTube).</p>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s),esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const hue=i=>(i*47)%360;
+const chips=(a,ids)=>a.map((t,i)=>`<span class="t" style="--h:${hue(i)};animation-delay:${i*70}ms">${esc(t)}${ids?`<small>${ids[i]}</small>`:""}</span>`).join("");
+const CORPUS="Tokenization is fun Tokenization is fun Tokenization is fun the tokenizer splits text into tokens and tokens become numbers the model can read tokenization is fun the model learns to predict the next token and a token is a piece of a word like token ization or un believ able low lower newest widest";
+const words=CORPUS.split(" ").map(w=>Array.from("\u2581"+w)),merges=[];
+(function(){let ws=words.map(w=>w.slice());for(let k=0;k<70;k++){const c=new Map();for(const w of ws)for(let i=0;i<w.length-1;i++){const p=w[i]+"\u0001"+w[i+1];c.set(p,(c.get(p)||0)+1)}
+let best=null,bc=1;for(const[p,v]of c)if(v>bc){best=p;bc=v}if(!best)break;const[a,b]=best.split("\u0001");merges.push([a,b]);
+ws=ws.map(w=>{const o=[];for(let i=0;i<w.length;i++){if(w[i]===a&&w[i+1]===b){o.push(a+b);i++}else o.push(w[i])}return o})}})();
+const vocab=new Map();[...new Set(words.flat())].sort().forEach(c=>vocab.set(c,vocab.size));merges.forEach(([a,b])=>vocab.set(a+b,vocab.size));
+const idOf=t=>vocab.has(t)?vocab.get(t):"U+"+t.codePointAt(0).toString(16);
+function bpe(text){const out=[];for(const p of text.match(/\s?[A-Za-z]+|\s?\d|\s?[^\sA-Za-z\d]+|\s+/g)||[]){let s=Array.from(p.replace(/^\s(?=\S)/,"\u2581").replace(/\s/g,"\u2581"));
+for(const[a,b]of merges){const o=[];for(let i=0;i<s.length;i++){if(s[i]===a&&s[i+1]===b){o.push(a+b);i++}else o.push(s[i])}s=o}out.push(...s)}return out}
+const wordsOf=t=>t.match(/\s?\w+|\s?[^\s\w]+|\s+/gu)||[];
+function hero(){const t=bpe("Tokenization is fun");$("#h1").innerHTML=chips(t);$("#h2").innerHTML=chips(t.map(x=>"\u2192"+idOf(x)).map(()=>""),null);$("#h2").innerHTML=t.map((x,i)=>`<span class="t" style="--h:${hue(i)};animation-delay:${400+i*70}ms">${idOf(x)}</span>`).join("")}
+function lab(){const v=$("#in").value,c=Array.from(v),w=wordsOf(v),b=bpe(v);
+$("#o1").innerHTML=chips(c.map(x=>x===" "?"\u2581":x));$("#o2").innerHTML=chips(w.map(x=>x.replace(/\s/g,"\u2581")));$("#o3").innerHTML=chips(b,b.map(idOf));
+const m=Math.max(c.length,w.length,b.length,1),r=[["Characters",c.length,"small vocab (hundreds)"],["Words",w.length,"huge vocab, breaks on new words"],["Toy subword",b.length,"balanced"]];
+$("#bars").innerHTML=r.map(x=>`<div class="bar"><b>${x[0]}</b><i style="width:${x[1]/m*55}%"></i><span>${x[1]} (${x[2]})</span></div>`).join("")}
+const P=["Tokenization is fun","unbelievably","ChatGPTify the lowerest","\u0928\u092e\u0938\u094d\u0924\u0947 \u0926\u0941\u0928\u093f\u092f\u093e","Hello world!"];
+$("#pre").innerHTML=P.map((p,i)=>`<button data-i="${i}">${esc(p)}</button>`).join("");
+$("#pre").onclick=e=>{if(e.target.dataset.i){$("#in").value=P[e.target.dataset.i];lab()}};$("#in").oninput=lab;
+const base={"l o w":5,"l o w e r":2,"n e w e s t":6,"w i d e s t":3};let st,ml;
+function pairs(){const c={};for(const[w,f]of st)for(let i=0;i<w.length-1;i++){const p=w[i]+" "+w[i+1];c[p]=(c[p]||0)+f}return Object.entries(c).sort((a,b)=>b[1]-a[1])}
+function rb(){const p=pairs();$("#bw").innerHTML=st.map(([w,f],i)=>`<div>${chips(w)} <span class="mut">\u00d7${f}</span></div>`).join("");
+$("#bp").innerHTML=p.length?p.slice(0,6).map((x,i)=>`<div class="bar"><b>${x[0].replace(" "," + ")}</b><i style="width:${x[1]*6}px;${i?"opacity:.45":""}"></i><span>${x[1]}${i?"":" \u2190 merged next"}</span></div>`).join(""):"<span class='mut'>nothing left to merge</span>";
+$("#bm").textContent=ml.length?ml.join(",  "):"none yet";const vs=new Set(st.flatMap(([w])=>w));$("#bv").textContent="Tokens currently in use: "+[...vs].join(", ");$("#nx").disabled=!p.length}
+function nx(){const p=pairs();if(!p.length)return;const[a,b]=p[0][0].split(" ");st=st.map(([w,f])=>{const o=[];for(let i=0;i<w.length;i++){if(w[i]===a&&w[i+1]===b){o.push(a+b);i++}else o.push(w[i])}return[o,f]});ml.push(a+" + "+b+" \u2192 "+a+b);rb()}
+function rs(){st=Object.entries(base).map(([k,f])=>[k.split(" "),f]);ml=[];rb()}
+$("#nx").onclick=nx;$("#rs").onclick=rs;rs();hero();lab();
+</script></body></html>
