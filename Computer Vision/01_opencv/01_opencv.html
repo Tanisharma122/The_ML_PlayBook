@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenCV: a visual guide</title>
+<style>
+:root{--ink:#111;--mut:#6e6e73;--g:rgba(255,255,255,.6);--line:rgba(0,0,0,.08)}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:#f5f5f7;font:16px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(620px 420px at 10% 6%,#d9e6ff,transparent 60%),radial-gradient(520px 440px at 90% 16%,#ffe2ea,transparent 60%),radial-gradient(640px 520px at 55% 96%,#def5e6,transparent 60%)}
+.glass{background:var(--g);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);border:1px solid rgba(255,255,255,.75);box-shadow:0 10px 34px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.85);border-radius:22px}
+main{max-width:1000px;margin:auto;padding:0 20px 70px}
+section{margin-top:64px}
+h1{font-size:clamp(2.6rem,8vw,5rem);letter-spacing:-.04em;line-height:1;margin:0 0 14px;font-weight:700}
+h2{font-size:clamp(1.6rem,4vw,2.2rem);letter-spacing:-.03em;margin:0 0 6px;font-weight:700}
+h3{font-size:1.05rem;margin:0 0 6px;letter-spacing:-.01em}
+p{margin:.4em 0;max-width:68ch}.mut{color:var(--mut)}
+.eyebrow{font-size:.85rem;color:var(--mut);margin-bottom:6px}
+nav{position:sticky;top:12px;z-index:9;max-width:640px;margin:12px auto 0;padding:8px 18px;overflow-x:auto;white-space:nowrap;border-radius:999px}
+nav a{color:var(--ink);text-decoration:none;font-size:.88rem;margin:0 10px;opacity:.65}nav a:hover{opacity:1}
+.hero{padding:70px 0 0;text-align:center}.hero p{margin:0 auto 18px;font-size:1.15rem;color:var(--mut)}
+.pill{display:inline-block;padding:5px 14px;border-radius:999px;font-size:.82rem;background:rgba(255,255,255,.7);border:1px solid var(--line);margin:3px}
+.card{padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-top:16px}
+.row{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+button{font:inherit;font-size:.88rem;border:1px solid var(--line);background:rgba(255,255,255,.8);color:var(--ink);padding:6px 14px;border-radius:999px;cursor:pointer;margin:3px 3px 3px 0}
+button:hover{background:#fff}button.on{background:#111;color:#fff;border-color:#111}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #0071e3;outline-offset:2px}
+input[type=range]{accent-color:#111;width:180px;vertical-align:middle}
+code,pre{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+pre{margin:10px 0 0;background:#111;color:#f2f2f7;padding:16px;border-radius:14px;overflow-x:auto;font-size:.82rem;line-height:1.55}
+#px{display:grid;grid-template-columns:repeat(8,40px);gap:3px}
+#px i{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font:600 .72rem ui-monospace,monospace;font-style:normal;cursor:crosshair}
+.sw{width:84px;height:84px;border-radius:18px;border:1px solid var(--line)}
+.lab{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center;font-size:.9rem}
+canvas{border-radius:14px;border:1px solid var(--line);image-rendering:pixelated;max-width:100%;background:#fff}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px}
+.flow .s{padding:12px 16px;text-align:center;min-width:120px}.flow .s b{display:block}.flow .s small{color:var(--mut);font-family:ui-monospace,monospace;font-size:.72rem}
+.flow .a{color:var(--mut);font-size:1.3rem}
+table{width:100%;border-collapse:collapse;font-size:.92rem}td,th{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:500}
+ul.l{padding-left:18px;margin:6px 0}ul.l li{margin:6px 0}a{color:#0071e3}
+.tile{padding:14px 16px}.tile code{font-size:.85rem}.tile p{font-size:.88rem;color:var(--mut);margin:2px 0 0}
+.warn{border-left:3px solid #ff9f0a;padding-left:12px}
+@media(prefers-reduced-motion:no-preference){.glass{transition:transform .2s}.tile:hover{transform:translateY(-3px)}}
+</style></head><body>
+<nav class="glass"><a href="#pix">Pixels</a><a href="#bgr">BGR</a><a href="#lab">Try cv2</a><a href="#mods">Modules</a><a href="#flow">Workflow</a><a href="#code">Code</a><a href="#cheat">Cheat sheet</a><a href="#links">Links</a></nav>
+<main>
+<header class="hero">
+<div class="eyebrow">Computer Vision · Part 1</div>
+<h1>OpenCV</h1>
+<p>The open-source library that lets code see: read images, change them, and understand what is in them.</p>
+<span class="pill">C++ core</span><span class="pill">Python via <code>cv2</code></span><span class="pill">Images, video, cameras</span><span class="pill">Runs deep-learning models</span>
+</header>
+
+<section id="pix"><div class="eyebrow">Demo 1</div><h2>An image is just a grid of numbers</h2>
+<p class="mut">Each square is one pixel of a tiny 8×8 grayscale image (0 = black, 255 = white). Hover to read a value, then drag the slider to brighten or darken the whole image.</p>
+<div class="glass card row" style="margin-top:14px">
+<div id="px"></div>
+<div style="flex:1;min-width:230px">
+<p><b id="rd">Hover over a pixel</b></p>
+<p><label>Brightness β <input type="range" id="br" min="-100" max="100" value="0"> <b id="bv">0</b></label></p>
+<p><label><input type="checkbox" id="nm" checked> show numbers</label></p>
+<pre>img = cv2.imread("tiny.png", 0)
+print(img.shape)        # (8, 8)
+img[3, 4]               # row 3, column 4
+# brightness: add β, clipped to 0-255
+bright = cv2.convertScaleAbs(img, alpha=1, beta=β)</pre>
+<p class="mut" style="font-size:.88rem">Values never go below 0 or above 255. That is called clipping.</p></div></div></section>
+
+<section id="bgr"><div class="eyebrow">Demo 2</div><h2>Color pixels are [Blue, Green, Red]</h2>
+<p class="mut">OpenCV stores color as <b>B, G, R</b>, the reverse of the usual RGB. Mix a color and compare what OpenCV means with what you see if you wrongly treat the array as RGB.</p>
+<div class="glass card row" style="margin-top:14px">
+<div class="lab"><span>B</span><input type="range" id="cb" max="255" value="30"><span>G</span><input type="range" id="cg" max="255" value="144"><span>R</span><input type="range" id="cr" max="255" value="255"></div>
+<div style="text-align:center"><div class="sw" id="s1"></div><small class="mut">Correct (BGR)</small></div>
+<div style="text-align:center"><div class="sw" id="s2"></div><small class="mut">Read as RGB (wrong)</small></div>
+<div style="flex:1;min-width:230px"><pre id="bt"></pre>
+<p class="warn mut" style="font-size:.88rem">Fix before showing in Matplotlib:<br><code>cv2.cvtColor(img, cv2.COLOR_BGR2RGB)</code></p></div></div></section>
+
+<section id="lab"><div class="eyebrow">Demo 3</div><h2>Try core cv2 operations</h2>
+<p class="mut">A generated sample image stands in for <code>cv2.imread</code>. Pick an operation to see the result, its new shape and the matching code.</p>
+<div class="glass card" style="margin-top:14px"><div id="ops"></div>
+<div class="row" style="margin-top:12px"><div><small class="mut">Input</small><br><canvas id="src" width="240" height="160"></canvas></div>
+<div><small class="mut">Output</small><br><canvas id="out" width="240" height="160"></canvas></div>
+<div style="flex:1;min-width:240px"><pre id="oc"></pre><p id="os" class="mut" style="font-size:.9rem"></p></div></div></div></section>
+
+<section id="mods"><div class="eyebrow">Map</div><h2>What is inside OpenCV</h2>
+<div class="grid">
+<div class="glass tile"><code>core</code><p>Arrays, math, basic data types</p></div>
+<div class="glass tile"><code>imgcodecs</code><p>Read and write image files</p></div>
+<div class="glass tile"><code>imgproc</code><p>Filters, color, shapes, contours</p></div>
+<div class="glass tile"><code>videoio</code><p>Cameras and video files</p></div>
+<div class="glass tile"><code>highgui</code><p>Windows, trackbars, mouse events</p></div>
+<div class="glass tile"><code>objdetect</code><p>Haar cascades, QR codes</p></div>
+<div class="glass tile"><code>dnn</code><p>Run trained neural networks</p></div>
+<div class="glass tile"><code>features2d</code><p>Keypoints and matching</p></div>
+<div class="glass tile"><code>calib3d</code><p>Camera calibration, 3D geometry</p></div>
+<div class="glass tile"><code>video</code><p>Tracking and optical flow</p></div></div></section>
+
+<section id="flow"><div class="eyebrow">Workflow</div><h2>Almost every program follows these steps</h2>
+<div class="flow">
+<div class="glass s"><b>1 Read</b><small>imread / VideoCapture</small></div><span class="a">→</span>
+<div class="glass s"><b>2 Convert</b><small>cvtColor</small></div><span class="a">→</span>
+<div class="glass s"><b>3 Process</b><small>blur, threshold, Canny</small></div><span class="a">→</span>
+<div class="glass s"><b>4 Detect</b><small>contours, models</small></div><span class="a">→</span>
+<div class="glass s"><b>5 Draw</b><small>rectangle, putText</small></div><span class="a">→</span>
+<div class="glass s"><b>6 Show / save</b><small>imshow / imwrite</small></div></div>
+<div class="flow"><div class="glass s"><b>Camera / image</b></div><span class="a">→</span><div class="glass s"><b>OpenCV</b><small>load, resize, normalize</small></div><span class="a">→</span><div class="glass s"><b>Deep model</b><small>YOLO, CNN</small></div><span class="a">→</span><div class="glass s"><b>OpenCV</b><small>draw boxes, display</small></div></div>
+<p class="mut">OpenCV handles the plumbing around a model, and can also run models itself through <code>dnn</code>.</p></section>
+
+<section id="code"><div class="eyebrow">Examples</div><h2>Code you can run</h2>
+<div class="glass card"><div id="tabs"></div><pre id="cd"></pre>
+<p class="mut" style="font-size:.88rem">Install: <code>pip install opencv-python</code> (or <code>opencv-python-headless</code> for servers and Colab, where windows cannot open).</p></div></section>
+
+<section id="cheat"><div class="eyebrow">Reference</div><h2>Cheat sheet</h2>
+<div class="glass card"><table>
+<tr><th>Task</th><th>Function</th></tr>
+<tr><td>Read / write image</td><td><code>cv2.imread</code>, <code>cv2.imwrite</code></td></tr>
+<tr><td>Resize / crop</td><td><code>cv2.resize(img, (w, h))</code>, <code>img[y1:y2, x1:x2]</code></td></tr>
+<tr><td>Color conversion</td><td><code>cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)</code> (or RGB, HSV)</td></tr>
+<tr><td>Blur / edges / threshold</td><td><code>GaussianBlur</code>, <code>Canny</code>, <code>threshold</code></td></tr>
+<tr><td>Contours</td><td><code>findContours</code>, <code>drawContours</code></td></tr>
+<tr><td>Draw</td><td><code>line</code>, <code>rectangle</code>, <code>circle</code>, <code>putText</code></td></tr>
+<tr><td>Video</td><td><code>VideoCapture</code>, <code>VideoWriter</code></td></tr>
+<tr><td>Neural network</td><td><code>cv2.dnn.readNet</code>, <code>blobFromImage</code></td></tr></table></div>
+<h2 style="margin-top:34px;font-size:1.4rem">Mistakes almost everyone makes</h2>
+<div class="grid">
+<div class="glass card"><h3>Colors look swapped</h3><p class="mut">You treated BGR as RGB. Convert with <code>COLOR_BGR2RGB</code> before Matplotlib.</p></div>
+<div class="glass card"><h3>Wrong resize shape</h3><p class="mut"><code>cv2.resize</code> takes <b>(width, height)</b>, but <code>img.shape</code> is (height, width).</p></div>
+<div class="glass card"><h3>imread returns None</h3><p class="mut">A wrong path gives no error. Always check <code>if img is None</code>.</p></div>
+<div class="glass card"><h3>Window won't show</h3><p class="mut">Call <code>cv2.waitKey()</code>. On servers or Colab, use the headless build and Matplotlib.</p></div></div></section>
+
+<section id="links"><div class="eyebrow">Go deeper</div><h2>References</h2>
+<div class="grid">
+<div class="glass card"><h3>Official</h3><ul class="l">
+<li><a href="https://docs.opencv.org/4.x/d6/d00/tutorial_py_root.html" target="_blank" rel="noopener">OpenCV-Python tutorials</a>: core operations, thresholding, gradients, contours, histograms</li>
+<li><a href="https://github.com/opencv/opencv" target="_blank" rel="noopener">opencv/opencv on GitHub</a></li></ul></div>
+<div class="glass card"><h3>Sample images to practice on</h3><ul class="l">
+<li><a href="https://github.com/opencv/opencv/tree/master/samples/data" target="_blank" rel="noopener">opencv/samples/data</a>: the images used in the official tutorials</li></ul></div>
+<div class="glass card"><h3>Examples to read</h3><ul class="l">
+<li><a href="https://github.com/Blessing988/opencv-python-tutorials" target="_blank" rel="noopener">opencv-python-tutorials</a>: image basics, thresholding, filtering, transformations and YOLO scripts</li></ul></div></div>
+<p class="mut" style="margin-top:20px">Next: Image Processing, then Object Detection.</p></section>
+</main>
+<script>
+const $=s=>document.querySelector(s),cl=v=>Math.max(0,Math.min(255,Math.round(v)));
+// Demo 1
+const base=[],px=$("#px");for(let r=0;r<8;r++)for(let c=0;c<8;c++)base.push(cl(255*Math.max(0,1-Math.hypot(r-3.5,c-3.5)/5.2)+(((r*7+c*3)%5)*6)));
+base.forEach((_,i)=>{const e=document.createElement("i");e.dataset.i=i;px.appendChild(e)});
+function drawPx(){const b=+$("#br").value;$("#bv").textContent=b;px.childNodes.forEach((e,i)=>{const v=cl(base[i]+b);e.style.background=`rgb(${v},${v},${v})`;e.style.color=v>140?"#111":"#fff";e.textContent=$("#nm").checked?v:""})}
+px.onmouseover=e=>{if(e.target.dataset.i){const i=+e.target.dataset.i;$("#rd").textContent=`img[${i>>3}, ${i%8}] = ${cl(base[i]+ +$("#br").value)}`}};
+$("#br").oninput=$("#nm").onchange=drawPx;drawPx();
+// Demo 2
+function bgr(){const b=+$("#cb").value,g=+$("#cg").value,r=+$("#cr").value;$("#s1").style.background=`rgb(${r},${g},${b})`;$("#s2").style.background=`rgb(${b},${g},${r})`;$("#bt").textContent=`img[0, 0] = [${b}, ${g}, ${r}]\n#              B    G    R`}
+["#cb","#cg","#cr"].forEach(s=>$(s).oninput=bgr);bgr();
+// Demo 3
+const W=240,H=160,sx=$("#src").getContext("2d");
+let g=sx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#6fa8ff");g.addColorStop(1,"#ffe1b5");sx.fillStyle=g;sx.fillRect(0,0,W,H);
+sx.fillStyle="#ffcf3f";sx.beginPath();sx.arc(56,42,22,0,7);sx.fill();
+sx.fillStyle="#2f8f5b";sx.beginPath();sx.moveTo(0,H);sx.lineTo(90,66);sx.lineTo(190,H);sx.fill();
+sx.fillStyle="#d64545";sx.fillRect(150,78,70,62);sx.fillStyle="#fff";sx.fillRect(163,90,15,15);sx.fillRect(192,90,15,15);
+const S=sx.getImageData(0,0,W,H).data;
+function mk(w,h,f){const d=new ImageData(w,h);for(let y=0;y<h;y++)for(let x=0;x<w;x++){const p=f(x,y),i=(y*w+x)*4;d.data.set([p[0],p[1],p[2],255],i)}return d}
+const px_=(x,y)=>{const i=(y*W+x)*4;return[S[i],S[i+1],S[i+2]]};
+const ch=k=>(x,y)=>{const v=px_(x,y)[k];return[v,v,v]};
+const OPS={
+"Original":["img = cv2.imread('scene.png')",()=>mk(W,H,px_),"img.shape → (160, 240, 3)"],
+"Gray":["gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)",()=>mk(W,H,(x,y)=>{const p=px_(x,y),v=.299*p[0]+.587*p[1]+.114*p[2];return[v,v,v]}),"gray.shape → (160, 240)  one channel"],
+"Blue channel":["b, g, r = cv2.split(img)\ncv2.imshow('B', b)",()=>mk(W,H,ch(2)),"b.shape → (160, 240). Bright where the scene has blue."],
+"Red channel":["b, g, r = cv2.split(img)\ncv2.imshow('R', r)",()=>mk(W,H,ch(0)),"r.shape → (160, 240). Bright where the scene has red."],
+"Wrong colors":["# showing a BGR array as if it were RGB\nplt.imshow(img)",()=>mk(W,H,(x,y)=>px_(x,y).reverse()),"Red and blue are swapped. Fix with COLOR_BGR2RGB."],
+"Flip":["flipped = cv2.flip(img, 1)   # 1 = horizontal",()=>mk(W,H,(x,y)=>px_(W-1-x,y)),"shape unchanged: (160, 240, 3)"],
+"Crop":["crop = img[40:120, 60:180]   # [y1:y2, x1:x2]",()=>mk(120,80,(x,y)=>px_(x+60,y+40)),"crop.shape → (80, 120, 3). Slicing is just NumPy."],
+"Resize ½":["small = cv2.resize(img, (120, 80))   # (width, height)",()=>mk(120,80,(x,y)=>px_(x*2,y*2)),"small.shape → (80, 120, 3). Note width comes first in resize."]};
+Object.keys(OPS).forEach((k,i)=>{const b=document.createElement("button");b.textContent=k;b.onclick=()=>run(k);$("#ops").appendChild(b)});
+function run(k){const[c,f,t]=OPS[k],d=f(),o=$("#out");o.width=d.width;o.height=d.height;o.getContext("2d").putImageData(d,0,0);$("#oc").textContent=c;$("#os").textContent=t;[...$("#ops").children].forEach(b=>b.classList.toggle("on",b.textContent===k))}
+run("Original");
+// Code tabs
+const CODE={
+"Read & save":`import cv2
+
+img = cv2.imread("photo.jpg")          # BGR array, or None if the path is wrong
+if img is None:
+    raise FileNotFoundError("Check the path")
+
+print(img.shape, img.dtype)            # (height, width, 3) uint8
+gray  = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+small = cv2.resize(img, (320, 240))    # (width, height)
+
+cv2.imshow("Photo", small)
+cv2.waitKey(0)                         # wait for a key
+cv2.destroyAllWindows()
+cv2.imwrite("gray.png", gray)`,
+"Draw":`cv2.rectangle(img, (50, 50), (200, 150), (0, 255, 0), 2)   # green box
+cv2.circle(img, (120, 100), 30, (0, 0, 255), -1)             # filled red circle
+cv2.line(img, (0, 0), (200, 150), (255, 0, 0), 2)            # blue line
+cv2.putText(img, "Hello", (50, 40),
+            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+# colors are (B, G, R)`,
+"Webcam":`cap = cv2.VideoCapture(0)             # 0 = default camera, or a video path
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+    cv2.imshow("Live", frame)
+    if cv2.waitKey(1) & 0xFF == ord("q"):   # press q to quit
+        break
+cap.release()
+cv2.destroyAllWindows()`,
+"Matplotlib":`import matplotlib.pyplot as plt
+
+plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))   # BGR → RGB first
+plt.axis("off")
+plt.show()`};
+Object.keys(CODE).forEach((k,i)=>{const b=document.createElement("button");b.textContent=k;b.onclick=()=>{$("#cd").textContent=CODE[k];[...$("#tabs").children].forEach(x=>x.classList.toggle("on",x===b))};$("#tabs").appendChild(b);if(!i)b.click()});
+</script></body></html>
