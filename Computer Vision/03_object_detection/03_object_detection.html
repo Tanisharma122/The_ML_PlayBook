@@ -1,0 +1,173 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>03 — Object Detection</title>
+<style>
+:root{color-scheme:light;--bg:#f6f8fc;--card:#fff;--bd:#dde3ee;--tx:#1b2433;--mu:#5d6b82;--ac:#1f6feb;--ok:#1a9d52;--no:#d63a3a}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:linear-gradient(180deg,#eaf1fd,var(--bg) 500px);color:var(--tx);font:16px/1.6 system-ui,Segoe UI,sans-serif}
+nav{position:sticky;top:0;z-index:9;display:flex;gap:4px;overflow-x:auto;padding:10px 16px;background:rgba(255,255,255,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--bd)}
+nav a{color:var(--mu);text-decoration:none;font-size:13px;padding:4px 10px;border-radius:99px;white-space:nowrap}nav a:hover{background:#eaf1fd;color:var(--ac)}
+main{max-width:1050px;margin:auto;padding:0 18px 80px}
+.hero{padding:64px 0 20px}.n{font:700 84px/1 ui-monospace,monospace;color:var(--ac)}h1{font-size:clamp(30px,6vw,54px);margin:0;letter-spacing:-1px}
+h2{margin:56px 0 6px;font-size:28px}h2 small{display:block;color:var(--ac);font:13px ui-monospace,monospace}
+p{color:#3a4659;max-width:80ch}.q{font-size:20px;color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 2px 10px rgba(30,60,120,.05)}
+.row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}.row>*{flex:1 1 260px;min-width:0}
+canvas{width:100%;height:auto;border-radius:10px;border:1px solid var(--bd);touch-action:none;display:block}
+label{display:flex;justify-content:space-between;font-size:13px;color:var(--mu);margin-top:8px}input[type=range]{width:100%;accent-color:var(--ac)}
+button{background:#fff;color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 12px;cursor:pointer;font:inherit;font-size:13px}button.on,button:hover{background:var(--ac);color:#fff;border-color:var(--ac)}
+pre,.mono{font:13px/1.55 ui-monospace,monospace;background:#f0f4fa;border:1px solid var(--bd);border-radius:10px;padding:12px;overflow:auto;white-space:pre;margin:8px 0}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.flow i{color:var(--ac);font-style:normal}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{color:var(--ac)}.tw{overflow-x:auto}
+.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.g3 .card{margin:0}
+code{color:#0b4fb5}a{color:var(--ac)}.t{color:var(--mu);font-size:13px}.ok{color:var(--ok)}.no{color:var(--no)}
+</style></head><body>
+<nav><a href="#hero">Start</a><a href="#vis">Visualizer</a><a href="#box">Bounding box</a><a href="#iou">IoU</a><a href="#nms">NMS</a><a href="#pipe">Pipeline</a><a href="#cmp">Detectors</a><a href="#yolo">YOLO</a><a href="#app">Applications</a><a href="#code">Code</a><a href="#chal">Challenge</a><a href="#cheat">Cheat sheet</a><a href="#links">Learn more</a></nav>
+<main>
+<section class="hero" id="hero"><div class="n">03</div><h1>OBJECT DETECTION</h1><p class="q">Finding what is in an image, and exactly where.</p>
+<p><b>Image classification</b> answers "what is this image?" with one label. <b>Object localisation</b> adds one box. <b>Object detection</b> finds every object of interest, giving each a <b>class label</b>, a <b>bounding box</b> and a <b>confidence score</b>. Segmentation (pixel-level masks) is a separate topic.</p>
+<div class="card flow"><b>IMAGE</b><i>→</i><b>MODEL</b><i>→</i><b>BOUNDING BOXES</b><i>→</i><b>CLASS LABELS</b><i>→</i><b>CONFIDENCE</b><i>→</i><b>FINAL DETECTIONS</b></div>
+<div class="card t"><b>About the images:</b> this file has no network access, so every demo uses a generated street scene drawn on a canvas. The detections shown are hand-defined to teach the ideas; they are not output from a trained model. Section 7 shows how to get real ones.</div></section>
+
+<h2 id="vis"><small>01 — DETECTION VISUALIZER + CONFIDENCE THRESHOLD</small>Image → boxes, labels, scores</h2>
+<p>A detector outputs many <i>candidates</i>, each with a score. A <b>confidence threshold</b> keeps only those at or above a value. Low threshold: more detections, including false ones. High threshold: fewer, more reliable ones, but real objects can be missed.</p>
+<div class="card row"><div><canvas id="v" width="640" height="400"></canvas></div><div><label>Confidence threshold <span id="tv"></span><input type="range" id="th" min="0" max="100" value="50"></label><div id="tg"></div><pre id="vt"></pre></div></div>
+
+<h2 id="box"><small>02 — BOUNDING BOX EXPLORER</small>Coordinates in image space</h2>
+<p>Image space has its origin (0,0) at the <b>top-left</b>, x grows right and y grows <i>down</i>. A box is stored as corners <code>(x1,y1,x2,y2)</code> (Pascal VOC, torchvision), or as <code>(cx,cy,w,h)</code> (YOLO, usually normalised to 0–1). Drag the box; drag its bottom-right square to resize.</p>
+<div class="card row"><canvas id="b" width="640" height="400"></canvas><pre id="bt"></pre></div>
+
+<h2 id="iou"><small>03 — IoU</small>Intersection over Union</h2>
+<p><b>IoU = area of overlap ÷ area of union</b>, from 0 (no overlap) to 1 (identical). It scores how well a predicted box matches the ground truth: a detection usually counts as correct when IoU ≥ 0.5 (and the class is right). It is also used inside NMS and in mAP. Drag and resize both boxes.</p>
+<div class="card row"><canvas id="i" width="640" height="400"></canvas><div><pre id="it"></pre><div class="t">Blue = box A (ground truth), orange = box B (prediction), green = intersection.</div></div></div>
+
+<h2 id="nms"><small>04 — NON-MAXIMUM SUPPRESSION</small>One object, one box</h2>
+<p>Detectors fire several overlapping boxes on the same object. NMS: (1) sort by confidence, (2) keep the best, (3) discard every remaining box of the same class whose IoU with it exceeds a threshold, (4) repeat with what is left. Move the IoU threshold.</p>
+<div class="card row"><div><canvas id="n" width="640" height="400"></canvas></div><div><label>NMS IoU threshold <span id="nv"></span><input type="range" id="ns" min="5" max="95" value="50"></label><pre id="nt"></pre><div class="t">Green = kept. Red dashed = suppressed. Too low a threshold merges neighbouring objects; too high leaves duplicates.</div></div></div>
+
+<h2 id="pipe"><small>05 — DETECTION PIPELINE</small>Click a stage</h2>
+<div class="card"><div id="pb" class="flow"></div><p id="pp"></p><pre id="pc"></pre></div>
+
+<h2 id="cmp"><small>06 — YOLO, SSD, FASTER R-CNN</small>Detector comparison</h2>
+<div class="card tw"><table><tr><th></th><th>YOLO</th><th>SSD</th><th>Faster R-CNN</th></tr>
+<tr><td><b>Type</b></td><td>Single-stage</td><td>Single-stage</td><td>Two-stage</td></tr>
+<tr><td><b>Idea</b></td><td>Predict boxes and classes for the whole image in one forward pass</td><td>Single pass, predicting from several feature-map scales with preset anchor boxes</td><td>A Region Proposal Network suggests regions, then a second head classifies and refines each</td></tr>
+<tr><td><b>Speed</b></td><td>Very fast (real-time)</td><td>Fast</td><td>Slower</td></tr>
+<tr><td><b>Accuracy</b></td><td>High in modern versions; historically weaker on small objects</td><td>Good; multi-scale helps small objects</td><td>Strong, especially localisation, at higher compute cost</td></tr>
+<tr><td><b>Use</b></td><td>Video, robotics, edge devices</td><td>Mobile and embedded</td><td>Offline analysis, accuracy-critical tasks</td></tr></table></div>
+<p><b>Single-stage:</b> one network directly outputs final candidates, so it is simpler and faster. <b>Two-stage:</b> propose regions first, then classify them, which usually costs speed but can improve accuracy. Modern single-stage models have narrowed the accuracy gap considerably.</p>
+
+<h2 id="yolo"><small>07 — YOLO INTUITION</small>"You Only Look Once"</h2>
+<p>Simplified view: the image is divided into a grid. The network (a CNN backbone extracting features, then a prediction head) outputs, for locations across the image, a box, an objectness/confidence value and class scores. Candidates are then filtered by threshold and NMS. <b>This is an intuition only</b>: real YOLO versions differ (anchors vs anchor-free, multiple scales, different heads). Click grid cells.</p>
+<div class="card row"><canvas id="y" width="640" height="400"></canvas><div><pre id="yt">Click a grid cell.</pre><p class="t"><b>Training:</b> images with labelled boxes are fed in, predictions are compared to labels with a loss (box, confidence, class), and weights are updated by gradient descent. <b>Inference:</b> weights are fixed; the model only predicts, then thresholding and NMS run. Datasets such as COCO provide annotations (class + box per object).</p></div></div>
+
+<h2 id="app"><small>08 — REAL-WORLD APPLICATIONS</small>Where it is used</h2>
+<div class="g3">
+<div class="card"><b>Autonomous vehicles</b><p>Cars, pedestrians, cyclists, traffic lights and signs, to plan safe motion.</p></div>
+<div class="card"><b>Surveillance</b><p>People, vehicles, left objects, for alerting and counting.</p></div>
+<div class="card"><b>Traffic monitoring</b><p>Vehicle counts and types for signal timing and congestion analysis.</p></div>
+<div class="card"><b>Retail</b><p>Products on shelves, stock gaps, checkout items.</p></div>
+<div class="card"><b>Industrial inspection</b><p>Scratches, missing parts, misaligned components on a line.</p></div>
+<div class="card"><b>Robotics</b><p>Objects to grasp or avoid, with box positions guiding the arm.</p></div>
+<div class="card"><b>Medical / assistive</b><p>Lesions or nodules flagged for review; obstacles and signs for navigation aids. A clinician makes the decision.</p></div>
+<div class="card"><b>Drone vision</b><p>Small vehicles, people or crops seen from altitude, where objects span few pixels.</p></div></div>
+
+<h2 id="code"><small>09 — PYTHON + OPENCV</small>Code</h2>
+<p><b>Traditional OpenCV</b> (thresholds, edges, contours, Haar cascades) uses hand-designed rules. <b>Deep-learning detection</b> uses a trained network that learned features from data. OpenCV can draw results and can also run some exported networks via <code>cv2.dnn</code>.</p>
+<div class="card"><div id="cb"></div><pre id="cx"></pre><div class="t" id="ce"></div></div>
+
+<h2 id="chal"><small>10 — MINI CHALLENGE</small>Which detections should be removed?</h2>
+<p>Below are candidate detections from the scene. Tick the ones you would <b>keep</b> at a sensible 0.5 confidence threshold, with NMS applied.</p>
+<div class="card row"><canvas id="c" width="640" height="400"></canvas><div><div id="cl"></div><button id="cg">Check</button> <button id="cs">Reset</button><div id="cr"></div></div></div>
+
+<h2 id="cheat"><small>11 — CHEAT SHEET</small>Quick reference</h2>
+<div class="card tw"><table><tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Bounding box</td><td>Rectangle around an object: (x1,y1,x2,y2) or (cx,cy,w,h)</td></tr>
+<tr><td>Class</td><td>Predicted category label</td></tr>
+<tr><td>Confidence</td><td>Model score (0–1) for the prediction; not always a calibrated probability</td></tr>
+<tr><td>IoU</td><td>overlap area / union area</td></tr>
+<tr><td>NMS</td><td>Removes duplicate boxes by confidence and IoU</td></tr>
+<tr><td>Precision</td><td>TP / (TP+FP): of the detections made, how many were right</td></tr>
+<tr><td>Recall</td><td>TP / (TP+FN): of the real objects, how many were found</td></tr>
+<tr><td>mAP</td><td>Mean over classes of average precision (area under the precision–recall curve); often reported at IoU 0.5 or averaged over 0.5–0.95</td></tr>
+<tr><td>Training / Inference</td><td>Learning weights from labelled data / using fixed weights to predict</td></tr>
+<tr><td>YOLO / SSD / Faster R-CNN</td><td>Single-stage / single-stage multi-scale / two-stage with region proposals</td></tr>
+<tr><td>OpenCV</td><td><code>cv2.imread</code>, <code>cv2.rectangle</code>, <code>cv2.putText</code>, <code>cv2.dnn.NMSBoxes</code>, <code>cv2.dnn.blobFromImage</code>, <code>cv2.imshow</code></td></tr></table></div>
+
+<h2 id="links"><small>LEARN MORE</small>References</h2>
+<div class="card"><ul>
+<li><a target="_blank" rel="noopener" href="https://docs.opencv.org/4.x/">OpenCV documentation</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.ultralytics.com/">Ultralytics (YOLO) documentation</a></li>
+<li><a target="_blank" rel="noopener" href="https://pytorch.org/vision/stable/models.html">TorchVision models (detection section)</a></li>
+<li><a target="_blank" rel="noopener" href="https://arxiv.org/abs/1506.02640">YOLO: You Only Look Once (Redmon et al.)</a></li>
+<li><a target="_blank" rel="noopener" href="https://arxiv.org/abs/1512.02325">SSD: Single Shot MultiBox Detector (Liu et al.)</a></li>
+<li><a target="_blank" rel="noopener" href="https://arxiv.org/abs/1506.01497">Faster R-CNN (Ren et al.)</a></li>
+<li><a target="_blank" rel="noopener" href="https://cocodataset.org/">COCO dataset</a></li></ul></div>
+</main>
+<script>
+const $=i=>document.getElementById(i),C={car:'#1f6feb',person:'#d9480f','traffic light':'#7048e8',bench:'#0b7285'};
+function R(a,b){return Math.round(a+Math.random()*(b-a))}
+function scene(x){let g=x.createLinearGradient(0,0,0,230);g.addColorStop(0,'#7db1e8');g.addColorStop(1,'#d8e6f3');x.fillStyle=g;x.fillRect(0,0,640,400);
+x.fillStyle='#9a9fa8';x.fillRect(0,80,640,160);x.fillStyle='#868b95';for(let i=0;i<8;i++)for(let j=0;j<3;j++){x.fillStyle=(i+j)%3?'#c9d6e6':'#5c6a80';x.fillRect(20+i*78,98+j*46,44,28)}
+x.fillStyle='#4b4f57';x.fillRect(0,240,640,160);x.fillStyle='#e6e6e6';for(let i=0;i<7;i++)x.fillRect(10+i*95,350,55,6);x.fillStyle='#aab';x.fillRect(0,236,640,8);
+// car1
+x.fillStyle='#b3262e';x.beginPath();x.roundRect(85,265,220,65,12);x.fill();x.fillStyle='#c93a42';x.beginPath();x.roundRect(125,225,140,48,14);x.fill();x.fillStyle='#bcd4ea';x.fillRect(138,234,52,32);x.fillRect(198,234,52,32);
+[[140,332],[250,332]].forEach(p=>{x.fillStyle='#16181c';x.beginPath();x.arc(p[0],p[1]-4,22,0,7);x.fill();x.fillStyle='#9aa';x.beginPath();x.arc(p[0],p[1]-4,9,0,7);x.fill()});
+// car2
+x.fillStyle='#2f4f7f';x.beginPath();x.roundRect(475,258,130,50,10);x.fill();x.fillStyle='#3d6099';x.beginPath();x.roundRect(500,232,80,32,10);x.fill();x.fillStyle='#bcd4ea';x.fillRect(508,238,30,20);x.fillRect(544,238,28,20);
+[[505,310],[575,310]].forEach(p=>{x.fillStyle='#16181c';x.beginPath();x.arc(p[0],p[1]-4,15,0,7);x.fill()});
+// person
+x.fillStyle='#e0b99a';x.beginPath();x.arc(405,186,13,0,7);x.fill();x.fillStyle='#2b6a4f';x.fillRect(388,201,34,70);x.fillStyle='#2a2f3d';x.fillRect(390,271,13,58);x.fillRect(407,271,13,58);
+// traffic light
+x.fillStyle='#444';x.fillRect(533,140,5,100);x.fillStyle='#222';x.fillRect(520,60,30,80);['#444','#444','#2fbf5b'].forEach((c,i)=>{x.fillStyle=c;x.beginPath();x.arc(535,78+i*24,9,0,7);x.fill()})}
+const GT=[{n:'car',c:.96,b:[80,222,310,338]},{n:'person',c:.91,b:[386,172,424,330]},{n:'traffic light',c:.87,b:[519,59,551,141]},{n:'car',c:.78,b:[470,230,610,314]},{n:'car',c:.31,b:[20,96,66,128]},{n:'person',c:.24,b:[531,140,541,238]}];
+function box(x,d,col,dash,lab,w){x.save();x.strokeStyle=col;x.lineWidth=w||3;x.setLineDash(dash?[7,5]:[]);const[a,b,c,e]=d;x.strokeRect(a,b,c-a,e-b);x.setLineDash([]);if(lab){x.font='bold 13px system-ui';const t=x.measureText(lab).width+8;x.fillStyle=col;x.fillRect(a-1,b-19,t,19);x.fillStyle='#fff';x.fillText(lab,a+3,b-5)}x.restore()}
+function ptr(c,e){const r=c.getBoundingClientRect();return[(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]}
+function drag(c,bs,draw){let s=null;c.onpointerdown=e=>{const[px,py]=ptr(c,e);for(let k=bs.length-1;k>=0;k--){const o=bs[k];if(Math.abs(px-(o.x+o.w))<14&&Math.abs(py-(o.y+o.h))<14){s={o,m:'r'};break}if(px>o.x&&px<o.x+o.w&&py>o.y&&py<o.y+o.h){s={o,m:'m',dx:px-o.x,dy:py-o.y};break}}if(s)c.setPointerCapture(e.pointerId)};
+c.onpointermove=e=>{if(!s)return;const[px,py]=ptr(c,e),o=s.o;if(s.m=='r'){o.w=Math.max(20,Math.min(640-o.x,px-o.x));o.h=Math.max(20,Math.min(400-o.y,py-o.y))}else{o.x=Math.max(0,Math.min(640-o.w,px-s.dx));o.y=Math.max(0,Math.min(400-o.h,py-s.dy))}draw()};c.onpointerup=()=>s=null}
+function iou(a,b){const w=Math.max(0,Math.min(a[2],b[2])-Math.max(a[0],b[0])),h=Math.max(0,Math.min(a[3],b[3])-Math.max(a[1],b[1])),i=w*h,u=(a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-i;return[i,u,u?i/u:0]}
+function nms(d,t){const s=[...d].sort((a,b)=>b.c-a.c),k=[],x=[];s.forEach(a=>{let sup=null;for(const q of k)if(q.n==a.n&&iou(q.b,a.b)[2]>t){sup=q;break}sup?x.push(a):k.push(a)});return[k,x]}
+
+// 1 visualizer
+const on=GT.map(()=>true);GT.forEach((d,i)=>{const l=document.createElement('label');l.style.cssText='justify-content:flex-start;gap:8px;color:#1b2433';l.innerHTML=`<input type="checkbox" checked> ${d.n} (${d.c.toFixed(2)})`;l.firstChild.onchange=e=>{on[i]=e.target.checked;vis()};$('tg').appendChild(l)});
+function vis(){const c=$('v'),x=c.getContext('2d'),t=$('th').value/100;scene(x);$('tv').textContent=t.toFixed(2);let s='class          conf  x1  y1  x2  y2\n';GT.forEach((d,i)=>{if(on[i]&&d.c>=t){box(x,d.b,C[d.n],0,`${d.n} ${d.c.toFixed(2)}`);s+=d.n.padEnd(14)+d.c.toFixed(2)+' '+d.b.map(v=>String(v).padStart(4)).join('')+'\n'}});$('vt').textContent=s+'\nThe two weakest candidates (0.31, 0.24) are false positives: they vanish above 0.31.'}
+$('th').oninput=vis;
+// 2 bbox
+const BB={x:380,y:165,w:60,h:170};
+function bx(){const c=$('b'),x=c.getContext('2d');scene(x);const o=BB,d=[o.x,o.y,o.x+o.w,o.y+o.h];box(x,d,'#1f6feb',0,'person?');x.fillStyle='#1f6feb';x.fillRect(d[2]-6,d[3]-6,12,12);
+x.fillStyle='#d63a3a';x.beginPath();x.arc(o.x+o.w/2,o.y+o.h/2,5,0,7);x.fill();x.strokeStyle='rgba(214,58,58,.6)';x.setLineDash([4,4]);x.beginPath();x.moveTo(0,0);x.lineTo(d[0],d[1]);x.stroke();x.setLineDash([]);x.fillStyle='#000';x.font='12px monospace';x.fillText('(0,0)',4,14);
+const f=Math.round;$('bt').textContent=`Corner format\nx1,y1 = ${f(d[0])}, ${f(d[1])}  (top-left)\nx2,y2 = ${f(d[2])}, ${f(d[3])}  (bottom-right)\nwidth = x2-x1 = ${f(o.w)}\nheight = y2-y1 = ${f(o.h)}\ncenter = (${f(d[0]+o.w/2)}, ${f(d[1]+o.h/2)})\n\nYOLO-style, normalised (image 640×400)\ncx=${(( d[0]+o.w/2)/640).toFixed(3)} cy=${((d[1]+o.h/2)/400).toFixed(3)}\nw=${(o.w/640).toFixed(3)} h=${(o.h/400).toFixed(3)}\n\nSlicing a crop: img[y1:y2, x1:x2]`}
+drag($('b'),[BB],bx);
+// 3 iou
+const A={x:150,y:120,w:200,h:160},B2={x:260,y:180,w:200,h:160};
+function io(){const c=$('i'),x=c.getContext('2d');x.fillStyle='#f4f7fb';x.fillRect(0,0,640,400);x.strokeStyle='#e1e7f0';for(let i=0;i<640;i+=40){x.beginPath();x.moveTo(i,0);x.lineTo(i,400);x.stroke()}for(let i=0;i<400;i+=40){x.beginPath();x.moveTo(0,i);x.lineTo(640,i);x.stroke()}
+const a=[A.x,A.y,A.x+A.w,A.y+A.h],b=[B2.x,B2.y,B2.x+B2.w,B2.y+B2.h];x.fillStyle='rgba(31,111,235,.25)';x.fillRect(A.x,A.y,A.w,A.h);x.fillStyle='rgba(240,140,0,.25)';x.fillRect(B2.x,B2.y,B2.w,B2.h);
+const ix=[Math.max(a[0],b[0]),Math.max(a[1],b[1]),Math.min(a[2],b[2]),Math.min(a[3],b[3])];if(ix[2]>ix[0]&&ix[3]>ix[1]){x.fillStyle='rgba(26,157,82,.55)';x.fillRect(ix[0],ix[1],ix[2]-ix[0],ix[3]-ix[1])}
+box(x,a,'#1f6feb',0,'A');box(x,b,'#f08c00',0,'B');[A,B2].forEach(o=>{x.fillStyle='#333';x.fillRect(o.x+o.w-6,o.y+o.h-6,12,12)});
+const[i,u,r]=iou(a,b);$('it').textContent=`Area A = ${Math.round(A.w*A.h)}\nArea B = ${Math.round(B2.w*B2.h)}\nIntersection = ${Math.round(i)}\nUnion = A+B-I = ${Math.round(u)}\n\nIoU = ${Math.round(i)} / ${Math.round(u)} = ${r.toFixed(3)}\n${r>=.5?'IoU >= 0.5: counts as a correct match':'IoU < 0.5: a poor match'}`}
+drag($('i'),[A,B2],io);
+// 4 nms
+const NC=[];(()=>{const s=[.93,.88,.74,.61,.45];s.forEach((c,k)=>{const j=k==3?[40,-20,35,0]:[R(-12,12),R(-12,12),R(-14,14),R(-12,12)];NC.push({n:'car',c,b:[80+j[0],222+j[1],310+j[2],338+j[3]]})});NC.push({n:'car',c:.82,b:[470,230,610,314]},{n:'car',c:.55,b:[462,236,598,322]})})();
+function nm(){const x=$('n').getContext('2d'),t=$('ns').value/100;scene(x);$('nv').textContent=t.toFixed(2);const[k,s]=nms(NC,t);s.forEach(d=>box(x,d.b,'#d63a3a',1,'',2));k.forEach(d=>box(x,d.b,'#1a9d52',0,`car ${d.c.toFixed(2)}`,4));
+let o='Ranked by confidence:\n';[...NC].sort((a,b)=>b.c-a.c).forEach(d=>{const q=k.find(z=>z!==d&&z.c>d.c&&iou(z.b,d.b)[2]>t);o+=`${d.c.toFixed(2)}  ${k.includes(d)?'KEEP':'drop (IoU '+(q?iou(q.b,d.b)[2].toFixed(2):'')+' with '+(q?q.c.toFixed(2):'')+')'}\n`});$('nt').textContent=o+`\n${NC.length} candidates → ${k.length} final`}
+$('ns').oninput=nm;
+// 5 pipeline
+const PS=[['Image','The raw frame (H×W×3, BGR in OpenCV).','img = cv2.imread("street.jpg")'],['Preprocessing','Resize (often letterboxed) to the network size, convert colour order, scale to 0–1.','blob = cv2.dnn.blobFromImage(img, 1/255, (640,640), swapRB=True)'],['Model','A CNN produces a large set of raw predictions (boxes, objectness, class scores) in one pass (single-stage) or after region proposals (two-stage).','net.setInput(blob); out = net.forward()'],['Candidate detections','Hundreds or thousands of boxes, most low-scoring and many overlapping.','# each row: [x, y, w, h, score, class...]'],['Confidence filtering','Drop candidates with score below the threshold (e.g. 0.25–0.5).','keep = scores > 0.5'],['NMS','Remove duplicates per object by IoU.','idx = cv2.dnn.NMSBoxes(boxes, scores, 0.5, 0.45)'],['Final detections','Boxes are rescaled to original image coordinates and drawn or passed on.','cv2.rectangle(img, (x1,y1), (x2,y2), (0,255,0), 2)']];
+PS.forEach((s,i)=>{const b=document.createElement('button');b.textContent=s[0];b.onclick=()=>{[...$('pb').querySelectorAll('button')].forEach(z=>z.classList.remove('on'));b.classList.add('on');$('pp').innerHTML=`<b>${i+1}. ${s[0]}.</b> ${s[1]}`;$('pc').textContent=s[2]};$('pb').appendChild(b);if(i<6){const a=document.createElement('i');a.textContent='→';$('pb').appendChild(a)}});$('pb').querySelector('button').click();
+// 6 yolo
+function yo(cx,cy){const x=$('y').getContext('2d');scene(x);const gw=80,gh=80;x.strokeStyle='rgba(255,255,255,.7)';x.lineWidth=1;for(let i=0;i<=8;i++){x.beginPath();x.moveTo(i*gw,0);x.lineTo(i*gw,400);x.stroke()}for(let j=0;j<=5;j++){x.beginPath();x.moveTo(0,j*gh);x.lineTo(640,j*gh);x.stroke()}
+let msg='Each cell predicts boxes + class scores.\nThis cell: no object centre here\n→ low confidence, filtered out.';if(cx!=null){x.fillStyle='rgba(31,111,235,.3)';x.fillRect(cx*gw,cy*gh,gw,gh);for(const d of GT.slice(0,4)){const mx=(d.b[0]+d.b[2])/2,my=(d.b[1]+d.b[3])/2;if(Math.floor(mx/gw)==cx&&Math.floor(my/gh)==cy){box(x,d.b,C[d.n],0,`${d.n} ${d.c.toFixed(2)}`);x.fillStyle='#d63a3a';x.beginPath();x.arc(mx,my,5,0,7);x.fill();msg=`Cell (${cx},${cy}) contains the centre of a ${d.n}.\nIt predicts offsets for the box,\nobjectness ≈ ${d.c.toFixed(2)}, and class scores.\n(Simplified: real models predict at several scales.)`}}}$('yt').textContent=msg}
+$('y').onclick=e=>{const[px,py]=ptr($('y'),e);yo(Math.floor(px/80),Math.floor(py/80))};
+// 7 code
+const CD={'Load + draw':['import cv2\nimg = cv2.imread("street.jpg")\nx1,y1,x2,y2 = 80,222,310,338\nlabel, conf = "car", 0.96\ncv2.rectangle(img,(x1,y1),(x2,y2),(0,255,0),2)\ncv2.putText(img,f"{label} {conf:.2f}",(x1,y1-8),\n  cv2.FONT_HERSHEY_SIMPLEX,0.6,(0,255,0),2)\ncv2.imshow("result",img); cv2.waitKey(0)','Rectangle takes two opposite corners; colour is BGR. putText places the label just above the box.'],
+'Pretrained (Ultralytics)':['# pip install ultralytics\nfrom ultralytics import YOLO\nimport cv2\nmodel = YOLO("yolov8n.pt")        # pretrained on COCO\nres = model("street.jpg", conf=0.5)[0]\nimg = cv2.imread("street.jpg")\nfor b in res.boxes:\n    x1,y1,x2,y2 = map(int, b.xyxy[0])\n    name = res.names[int(b.cls[0])]\n    cv2.rectangle(img,(x1,y1),(x2,y2),(0,255,0),2)\n    cv2.putText(img,f"{name} {float(b.conf[0]):.2f}",(x1,y1-8),0,0.6,(0,255,0),2)','The library downloads weights on first use. NMS and thresholding already happened inside the call. Check the Ultralytics docs for current model names.'],
+'Inference structure':['img = cv2.imread(path)                       # 1 load\nblob = cv2.dnn.blobFromImage(img,1/255,(640,640),swapRB=True)  # 2 preprocess\nnet.setInput(blob); out = net.forward()       # 3 model\nboxes, scores = decode(out)                   # 4 candidates (model-specific)\nkeep = [i for i,s in enumerate(scores) if s>0.5]  # 5 threshold\nidx = cv2.dnn.NMSBoxes([boxes[i] for i in keep],\n  [scores[i] for i in keep], 0.5, 0.45)       # 6 NMS\n# 7 draw with cv2.rectangle','This needs an exported network loaded with cv2.dnn.readNet; the decode step depends on the model format.'],
+'Traditional vs deep':['# Traditional OpenCV: hand-made rules\ngray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)\n_, m = cv2.threshold(gray,120,255,cv2.THRESH_BINARY)\ncnts,_ = cv2.findContours(m,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)\nfor c in cnts: x,y,w,h = cv2.boundingRect(c)\n# finds blobs, with no idea what they are\n\n# Deep learning: a trained model outputs class + confidence\n# res = model(img)','Contours give boxes but no class or confidence, and break with lighting or clutter. A trained detector learns class-specific features from labelled data.']};
+Object.keys(CD).forEach((k,i)=>{const b=document.createElement('button');b.textContent=k;b.style.margin='2px';b.onclick=()=>{[...$('cb').children].forEach(z=>z.classList.remove('on'));b.classList.add('on');$('cx').textContent=CD[k][0];$('ce').textContent=CD[k][1]};$('cb').appendChild(b);if(!i)b.click()});
+// 8 challenge
+const CH=[{n:'car',c:.94,b:[80,222,310,338]},{n:'car',c:.71,b:[92,230,322,342]},{n:'person',c:.88,b:[386,172,424,330]},{n:'traffic light',c:.9,b:[519,59,551,141]},{n:'car',c:.82,b:[470,230,610,314]},{n:'person',c:.22,b:[531,140,541,238]},{n:'car',c:.35,b:[20,96,66,128]}];
+const KEEP=[1,0,1,1,1,0,0];let ck=CH.map(()=>false);
+function cdraw(rev){const x=$('c').getContext('2d');scene(x);CH.forEach((d,i)=>{box(x,d.b,rev?(KEEP[i]?'#1a9d52':'#d63a3a'):C[d.n],rev&&!KEEP[i],`${i+1}: ${d.n} ${d.c.toFixed(2)}`,2)})}
+function cbuild(){$('cl').innerHTML='';$('cr').innerHTML='';ck=CH.map(()=>false);CH.forEach((d,i)=>{const l=document.createElement('label');l.style.cssText='justify-content:flex-start;gap:8px;color:#1b2433';l.innerHTML=`<input type="checkbox"> ${i+1}: ${d.n}, ${d.c.toFixed(2)}`;l.firstChild.onchange=e=>ck[i]=e.target.checked;$('cl').appendChild(l)});cdraw(false)}
+$('cg').onclick=()=>{const w=CH.map((d,i)=>(ck[i]?1:0)!=KEEP[i]).filter(Boolean).length;cdraw(true);$('cr').innerHTML=`<p><b class="${w?'no':'ok'}">${w?w+' mismatch(es).':'All correct.'}</b></p><p class="t">Expected: keep #1, 3, 4, 5 (confident, distinct objects). Remove #2 (0.71 but overlaps #1 with high IoU: NMS duplicate), #6 (0.22, a pole, below threshold) and #7 (0.35, a building window, below threshold). Green = keep, red dashed = remove.</p>`};
+$('cs').onclick=cbuild;
+vis();bx();io();nm();yo();cbuild();
+</script></body></html>
