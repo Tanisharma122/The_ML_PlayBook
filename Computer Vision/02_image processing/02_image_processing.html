@@ -1,0 +1,278 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>02 — Image Processing</title>
+<style>
+:root{--bg:#0b0f17;--card:rgba(255,255,255,.05);--bd:rgba(255,255,255,.1);--tx:#e6eaf2;--mu:#98a2b8;--ac:#5eb3ff}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,#16294a,transparent),var(--bg);color:var(--tx);font:16px/1.6 system-ui,Segoe UI,sans-serif}
+nav{position:sticky;top:0;z-index9;z-index:9;display:flex;gap:4px;overflow-x:auto;padding:10px 16px;background:rgba(11,15,23,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--bd)}
+nav a{color:var(--mu);text-decoration:none;font-size:13px;padding:4px 10px;border-radius:99px;white-space:nowrap}nav a:hover{background:var(--card);color:var(--tx)}
+main{max-width:1050px;margin:auto;padding:0 18px 80px}
+.hero{padding:70px 0 30px}.hero .n{font:700 90px/1 ui-monospace,monospace;color:var(--ac);opacity:.9}
+h1{font-size:clamp(30px,6vw,56px);margin:0;letter-spacing:-1px}h2{margin:60px 0 6px;font-size:28px}h2 small{color:var(--ac);font:13px ui-monospace,monospace;display:block}
+p{color:#c3cbdb;max-width:80ch}.q{font-size:20px;color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:18px;margin:14px 0;backdrop-filter:blur(8px)}
+.row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}.row>*{flex:1 1 240px;min-width:0}
+canvas{width:100%;height:auto;border-radius:10px;border:1px solid var(--bd);background:#000;image-rendering:auto}.px{image-rendering:pixelated}
+figure{margin:0}figcaption{font-size:12px;color:var(--mu);margin-top:4px;text-align:center}
+label{display:flex;justify-content:space-between;font-size:13px;color:var(--mu);margin-top:8px}input[type=range]{width:100%;accent-color:var(--ac)}
+button,select{background:#18233a;color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 12px;cursor:pointer;font:inherit;font-size:13px}button.on,button:hover{background:var(--ac);color:#04101f}
+pre,.mono{font:13px/1.5 ui-monospace,monospace;background:#070a11;border:1px solid var(--bd);border-radius:10px;padding:12px;overflow:auto;color:#cfe6ff;margin:8px 0;white-space:pre}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.flow span{padding:8px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);font-size:13px}.flow i{color:var(--ac);font-style:normal}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px;border-bottom:1px solid var(--bd);text-align:left}th{color:var(--ac)}.tw{overflow-x:auto}
+.t{color:var(--mu);font-size:13px}code{color:#9fd0ff}a{color:var(--ac)}.bad{border-left:3px solid #ff7a7a}
+</style></head><body>
+<nav><a href="#hero">Start</a><a href="#flow">Pipeline of vision</a><a href="#pix">Pixels</a><a href="#chan">Channels</a><a href="#tf">Transforms</a><a href="#bc">Brightness</a><a href="#norm">Normalize</a><a href="#noise">Noise</a><a href="#filt">Filters</a><a href="#thr">Threshold</a><a href="#edge">Edges</a><a href="#morph">Morphology</a><a href="#pipe">Pipeline</a><a href="#ml">ML</a><a href="#code">Code</a><a href="#ref">Tables</a><a href="#mist">Mistakes</a><a href="#chal">Challenge</a><a href="#links">Learn more</a></nav>
+<main>
+<section class="hero" id="hero"><div class="n">02</div><h1>IMAGE PROCESSING</h1><p class="q">Transforming raw pixels into useful visual information.</p>
+<p>Image processing applies numerical operations to an image array to enhance it, clean it, or expose structure, so a person or a model can use it. Every demo below runs on real pixel data in your browser, using a canvas and plain JavaScript implementations of the same algorithms OpenCV uses.</p>
+<div class="card"><b>Test image.</b> <span class="t">This file has no network access, so it ships with a generated scene (sky, building, windows, road, sign, sun) with sensor-like grain. Use your own photograph in every lab:</span> <input type="file" id="up" accept="image/*">
+<div class="row" style="margin-top:12px"><figure><canvas id="h1"></canvas><figcaption>Original</figcaption></figure><figure><canvas id="h2"></canvas><figcaption>Grayscale</figcaption></figure><figure><canvas id="h3"></canvas><figcaption>Gaussian blur 5×5</figcaption></figure><figure><canvas id="h4"></canvas><figcaption>Canny edges</figcaption></figure></div></div></section>
+
+<h2 id="flow"><small>01 — WHAT IS IT?</small>From the world to a model</h2>
+<p>A camera samples light onto a grid of sensors. Each sensor reports a number, so an image is simply an array. Processing changes those numbers on purpose: preprocessing makes data consistent (size, range, noise), and feature operations (thresholds, edges) expose structure. A processed image is a new array, not a "better" one in general; it is better only for a specific task.</p>
+<div class="card flow"><span>Real world</span><i>→</i><span>Camera</span><i>→</i><span>Digital image</span><i>→</i><span>Pixels</span><i>→</i><span>Image processing</span><i>→</i><span>Useful information</span><i>→</i><span>CV / ML model</span></div>
+
+<h2 id="pix"><small>02 — IMAGE AS NUMBERS</small>Pixel Explorer</h2>
+<p>Hover (or touch) the image. Grayscale is <code>H × W</code>; colour is <code>H × W × 3</code>. A <b>pixel</b> is one grid cell, a <b>channel</b> is one number layer per pixel, <b>width/height</b> are columns/rows, and <b>resolution</b> is the pixel count (W×H). In NumPy, <code>img[y, x]</code> is row first.</p>
+<div class="card row"><figure><canvas id="pxc"></canvas></figure><div><div class="mono" id="pxi">Move over the image</div><canvas id="pz" class="px" width="126" height="126" style="max-width:252px"></canvas><div class="mono" id="pm"></div></div></div>
+
+<h2 id="chan"><small>03 — COLOUR CHANNELS</small>Channel Visualizer</h2>
+<p>Standard RGB order is Red, Green, Blue. <b>OpenCV loads colour images as BGR</b>, so <code>img[y,x]</code> returns <code>[B,G,R]</code>. Showing a BGR array with Matplotlib without converting swaps red and blue.</p>
+<div class="card"><div id="chb"></div><div class="row"><figure><canvas id="chc"></canvas></figure><div><label>Add to Red <span id="vr">0</span><input type="range" id="cr" min="-100" max="100" value="0"></label><label>Add to Green <span id="vg">0</span><input type="range" id="cg" min="-100" max="100" value="0"></label><label>Add to Blue <span id="vb">0</span><input type="range" id="cb" min="-100" max="100" value="0"></label><div class="mono" id="chn"></div></div></div></div>
+
+<h2 id="tf"><small>04 — TRANSFORMATIONS</small>Transformation Laboratory</h2>
+<div class="card"><div class="row"><figure><canvas id="t1"></canvas><figcaption id="t1d"></figcaption></figure><figure><canvas id="t2" style="width:auto;max-width:100%"></canvas><figcaption id="t2d"></figcaption></figure></div>
+<div class="row"><div><label>Resize scale <span id="a1"></span><input type="range" id="s1" min="25" max="200" value="100"></label><label>Crop (keep centre %) <span id="a2"></span><input type="range" id="s2" min="30" max="100" value="100"></label><label>Rotate° <span id="a3"></span><input type="range" id="s3" min="-180" max="180" value="0"></label></div><div><label>Translate x px <span id="a4"></span><input type="range" id="s4" min="-100" max="100" value="0"></label><label>Translate y px <span id="a5"></span><input type="range" id="s5" min="-100" max="100" value="0"></label><button id="fh">Flip horizontal</button> <button id="fv">Flip vertical</button> <button id="rs">Reset</button></div></div>
+<div class="mono" id="tfx"></div></div>
+
+<h2 id="bc"><small>05 — BRIGHTNESS & CONTRAST</small>output = α × input + β</h2>
+<p>α (contrast) stretches the gap between dark and bright; β (brightness) slides every value up or down. Results are clipped to 0–255, which destroys detail (saturation). The histogram shows what happens.</p>
+<div class="card row"><figure><canvas id="b1"></canvas><figcaption>Input</figcaption></figure><figure><canvas id="b2"></canvas><figcaption>Output</figcaption></figure><div><label>α contrast <span id="ba"></span><input type="range" id="bas" min="20" max="300" value="100"></label><label>β brightness <span id="bb"></span><input type="range" id="bbs" min="-100" max="100" value="0"></label><canvas id="bh" width="256" height="80"></canvas><div class="mono" id="bf"></div><code>cv2.convertScaleAbs(img, alpha=a, beta=b)</code></div></div>
+
+<h2 id="norm"><small>06 — NORMALIZATION</small>0–255 → 0–1</h2>
+<p>Models train more stably when inputs share a small, consistent range. Common choices: divide by 255 (0–1), or standardise with <code>(x − mean) / std</code>. Pick the patch location:</p>
+<div class="card row"><div><label>Patch x <span id="nxv"></span><input type="range" id="nx" min="0" max="230" value="100"></label><label>Patch y <span id="nyv"></span><input type="range" id="ny" min="0" max="170" value="60"></label><select id="nm"><option value="a">x / 255</option><option value="b">(x − mean) / std</option></select></div><div class="mono" id="n1"></div><div class="mono" id="n2"></div></div>
+
+<h2 id="noise"><small>07 — IMAGE NOISE</small>Noise Laboratory</h2>
+<p>Noise is unwanted random variation. Causes: low light and high ISO (Gaussian-like sensor noise), thermal effects, compression, and transmission errors or dead pixels (salt-and-pepper). Noise adds false gradients, which breaks thresholds and edge detectors.</p>
+<div class="card row"><figure><canvas id="n3"></canvas><figcaption>Original</figcaption></figure><figure><canvas id="n4"></canvas><figcaption>Noisy</figcaption></figure><div><select id="nt"><option value="g">Gaussian</option><option value="s">Salt &amp; pepper</option></select><label>Intensity <span id="nv"></span><input type="range" id="ni" min="0" max="100" value="30"></label></div></div>
+
+<h2 id="filt"><small>08 — FILTERING</small>Filtering Laboratory</h2>
+<div class="card"><div><button data-f="o" class="on">Original</button> <button data-f="g">Gaussian</button> <button data-f="m">Median</button> <button data-f="a">Average</button> <button data-f="s">Sharpen</button></div>
+<div class="row"><figure><canvas id="f1"></canvas><figcaption>Noisy image</figcaption></figure><figure><canvas id="f2"></canvas><figcaption id="fc">Original</figcaption></figure><div><label>Kernel size <span id="fv2"></span><input type="range" id="fk" min="1" max="3" value="1"></label><div class="mono" id="ft"></div></div></div></div>
+
+<h2 id="thr"><small>09 — THRESHOLDING</small>Intensity → 0 or 255</h2>
+<div class="card"><select id="tm"><option value="b">Binary</option><option value="i">Inverse</option><option value="a">Adaptive (mean, 15×15, C=7)</option></select><div class="row"><figure><canvas id="th1"></canvas><figcaption>Grayscale</figcaption></figure><figure><canvas id="th2"></canvas><figcaption>Result</figcaption></figure><div><label>Threshold T <span id="tv"></span><input type="range" id="ts" min="0" max="255" value="120"></label><div class="mono" id="tt"></div></div></div></div>
+
+<h2 id="edge"><small>10 — EDGE DETECTION</small>Edge Laboratory</h2>
+<p>An edge is a rapid change in intensity. Sobel estimates the horizontal and vertical derivatives; the gradient magnitude is √(Gx²+Gy²). Canny smooths, computes gradients, thins edges with non-maximum suppression, then uses hysteresis: pixels above the high threshold are kept, and pixels between low and high are kept only if connected to a strong one.</p>
+<div class="card"><div id="eb"></div><div class="row"><figure><canvas id="e1"></canvas><figcaption>Grayscale</figcaption></figure><figure><canvas id="e2"></canvas><figcaption id="ec"></figcaption></figure><div><label>Canny low <span id="elv"></span><input type="range" id="el" min="1" max="200" value="30"></label><label>Canny high <span id="ehv"></span><input type="range" id="eh" min="1" max="300" value="90"></label><code>cv2.Canny(gray, low, high)</code></div></div></div>
+
+<h2 id="morph"><small>11 — MORPHOLOGY</small>Morphological Lab</h2>
+<div class="card"><div id="mb"></div><div class="row"><figure><canvas id="m1" class="px"></canvas><figcaption>Binary input (specks + holes)</figcaption></figure><figure><canvas id="m2" class="px"></canvas><figcaption id="mc"></figcaption></figure><div><label>Kernel <span id="mkv"></span><input type="range" id="mk" min="1" max="4" value="1"></label><canvas id="mkc" class="px" width="90" height="90" style="max-width:90px"></canvas><div class="mono" id="mt"></div></div></div></div>
+
+<h2 id="pipe"><small>12 — FULL PIPELINE</small>Click a stage</h2>
+<div class="card"><div id="pb" class="flow"></div><div class="row"><figure><canvas id="p1" class="px"></canvas></figure><div id="pt"></div></div></div>
+
+<h2 id="ml"><small>13–14 — AI/ML AND USES</small>Where it fits</h2>
+<div class="card flow"><span>Raw image</span><i>→</i><span>Preprocessing</span><i>→</i><span>Model input tensor</span><i>→</i><span>CNN / vision model</span><i>→</i><span>Prediction</span></div>
+<p>Image processing manipulates pixels; computer vision extracts meaning; machine learning learns patterns from data; deep learning uses multi-layer networks (CNNs, ViTs). Deep models learn many features themselves, but resizing, normalisation, noise handling and standardisation remain standard so inputs match training data.</p>
+<div class="card tw"><table><tr><th>Domain</th><th>Typical processing</th><th>Why</th></tr><tr><td>Medical imaging</td><td>Contrast stretch, denoise</td><td>Reveal low-contrast tissue</td></tr><tr><td>Satellite imagery</td><td>Normalise bands, resample</td><td>Compare scenes across dates</td></tr><tr><td>Documents / OCR prep</td><td>Grayscale, adaptive threshold</td><td>Handle uneven lighting</td></tr><tr><td>Industrial inspection</td><td>Threshold, morphology</td><td>Isolate defects</td></tr><tr><td>Autonomous vehicles</td><td>Resize, normalise, denoise</td><td>Consistent model input</td></tr><tr><td>Security cameras</td><td>Denoise, brightness fix</td><td>Low-light footage</td></tr><tr><td>Robotics</td><td>Blur, edges</td><td>Stable structure cues</td></tr></table></div>
+
+<h2 id="code"><small>15 — PYTHON + OPENCV</small>Code</h2>
+<div class="card"><div id="cb2"></div><pre id="cx"></pre><div class="t" id="ce"></div></div>
+
+<h2 id="ref"><small>16 + 19 — REFERENCE</small>Cheat sheet</h2>
+<div class="card tw"><table><tr><th>Function</th><th>What it does</th><th>Example</th></tr>
+<tr><td>cv2.imread / imwrite</td><td>Load / save image (BGR)</td><td>img = cv2.imread("a.jpg")</td></tr>
+<tr><td>cv2.cvtColor</td><td>Colour conversion</td><td>cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)</td></tr>
+<tr><td>cv2.resize</td><td>Change size (width, height)</td><td>cv2.resize(img, (224, 224))</td></tr>
+<tr><td>NumPy slicing</td><td>Crop (rows, then cols)</td><td>img[y1:y2, x1:x2]</td></tr>
+<tr><td>cv2.rotate / flip</td><td>90° rotation / mirror</td><td>cv2.flip(img, 1)</td></tr>
+<tr><td>cv2.GaussianBlur</td><td>Smooth, weights by distance</td><td>cv2.GaussianBlur(img, (5,5), 0)</td></tr>
+<tr><td>cv2.medianBlur</td><td>Remove salt-and-pepper</td><td>cv2.medianBlur(img, 5)</td></tr>
+<tr><td>cv2.threshold</td><td>Global binarisation</td><td>cv2.threshold(g, 127, 255, cv2.THRESH_BINARY)</td></tr>
+<tr><td>cv2.adaptiveThreshold</td><td>Local threshold</td><td>cv2.adaptiveThreshold(g,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,15,7)</td></tr>
+<tr><td>cv2.Canny</td><td>Edge map</td><td>cv2.Canny(g, 50, 150)</td></tr>
+<tr><td>cv2.erode / dilate</td><td>Shrink / grow foreground</td><td>cv2.dilate(b, kernel)</td></tr></table></div>
+<div class="card tw"><table><tr><th>Filter</th><th>Best for</th><th>Main effect</th></tr><tr><td>Gaussian</td><td>General Gaussian-like noise, pre-edge smoothing</td><td>Soft blur</td></tr><tr><td>Median</td><td>Salt-and-pepper</td><td>Removes outliers, keeps edges better</td></tr><tr><td>Average</td><td>Quick smoothing, adaptive threshold</td><td>Uniform blur</td></tr><tr><td>Sharpen</td><td>Soft images</td><td>Boosts edges (and noise)</td></tr></table></div>
+
+<h2 id="mist"><small>17 — COMMON MISTAKES</small>Avoid these</h2>
+<div class="row">
+<div class="card bad"><b>Width vs height.</b> <code>img.shape</code> is (H, W, C) but <code>cv2.resize</code> takes (W, H).</div>
+<div class="card bad"><b>RGB vs BGR.</b> OpenCV is BGR; convert before plotting or feeding RGB-trained models.</div>
+<div class="card bad"><b>Data types.</b> uint8 overflows (250+10 wraps to 4). Convert to float32 before maths, and clip back.</div>
+<div class="card bad"><b>Too much blur.</b> Destroys small details and weak edges.</div>
+<div class="card bad"><b>Bad thresholds.</b> One global T fails on uneven lighting; use adaptive or Otsu. Canny low/high far apart or too high gives broken or empty edges.</div>
+<div class="card bad"><b>Always-better assumption.</b> Preprocessing is task dependent; it can discard information a model needs. Match training-time preprocessing at inference.</div></div>
+
+<h2 id="chal"><small>18 — MINI CHALLENGE</small>Prepare this noisy image for edge-based analysis</h2>
+<div class="card"><div class="row"><canvas id="c1" style="max-width:300px"></canvas><div><p class="t">Click steps in the order you would apply them.</p><div id="cs"></div><div class="mono" id="co">Your order: —</div><button id="cc">Check</button> <button id="cr2">Reset</button><div id="cf"></div></div></div></div>
+
+<h2><small>20 — KEY TAKEAWAYS</small>Summary</h2>
+<div class="card"><div class="flow"><span>IMAGE</span><i>=</i><span>PIXELS</span><i>+</i><span>CHANNELS</span><i>+</i><span>NUMERICAL VALUES</span></div><br><div class="flow"><span>IMAGE PROCESSING</span><i>=</i><span>TRANSFORMING IMAGE DATA FOR A SPECIFIC PURPOSE</span></div>
+<p>Images are arrays (H×W×C). Geometry changes layout; point operations (brightness, contrast, threshold) change values independently; filters and edges use neighbourhoods; morphology reshapes binary regions. Order matters: denoise before edges, and always match the preprocessing your model expects.</p></div>
+
+<h2 id="links"><small>LEARN MORE</small>References</h2>
+<div class="card"><ul>
+<li><a target="_blank" rel="noopener" href="https://docs.opencv.org/4.x/d6/d00/tutorial_py_root.html">OpenCV-Python Tutorials</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.opencv.org/4.x/">OpenCV documentation</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/opencv/opencv">OpenCV on GitHub</a></li>
+<li><a target="_blank" rel="noopener" href="https://scikit-image.org/docs/stable/">scikit-image documentation</a></li>
+<li><a target="_blank" rel="noopener" href="https://numpy.org/doc/stable/">NumPy documentation</a></li></ul></div>
+</main>
+<script>
+const $=i=>document.getElementById(i),cl=v=>v<0?0:v>255?255:v;let W=240,H=180,SRC;
+function mk(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c}
+function put(c,d){c.width=d.width;c.height=d.height;c.getContext('2d').putImageData(d,0,0)}
+function rnd(s){return()=>(s=(s*1664525+1013904223)>>>0)/4294967296}
+function scene(){const c=mk(W,H),x=c.getContext('2d');let g=x.createLinearGradient(0,0,0,110);g.addColorStop(0,'#3f7fd0');g.addColorStop(1,'#d9e8f5');x.fillStyle=g;x.fillRect(0,0,W,H);
+x.fillStyle='#ffd34d';x.beginPath();x.arc(195,32,17,0,7);x.fill();x.fillStyle='#5a7a4a';x.fillRect(0,100,W,20);
+x.fillStyle='#8a4b3a';x.fillRect(30,40,100,75);x.fillStyle='#6d3b2d';x.fillRect(30,34,100,8);
+for(let i=0;i<3;i++)for(let j=0;j<3;j++){x.fillStyle=(i+j)%2?'#f3dc8a':'#2b3b52';x.fillRect(42+i*30,50+j*21,18,13)}
+x.fillStyle='#3b3b40';x.fillRect(0,118,W,62);x.fillStyle='#e8e8e8';for(let i=0;i<6;i++)x.fillRect(10+i*40,146,24,4);
+x.fillStyle='#e8e8e8';x.fillRect(165,70,48,30);x.fillStyle='#b32020';x.fillRect(169,74,40,6);x.fillStyle='#222';x.fillRect(169,84,30,3);x.fillRect(169,91,22,3);x.fillStyle='#555';x.fillRect(187,100,4,20);
+const d=x.getImageData(0,0,W,H),r=rnd(7);for(let i=0;i<d.data.length;i+=4){const n=(r()-.5)*14;d.data[i]=cl(d.data[i]+n);d.data[i+1]=cl(d.data[i+1]+n);d.data[i+2]=cl(d.data[i+2]+n)}return d}
+function clone(d){return new ImageData(new Uint8ClampedArray(d.data),d.width,d.height)}
+function toG(d){const g=new Float32Array(d.width*d.height);for(let i=0;i<g.length;i++)g[i]=.299*d.data[i*4]+.587*d.data[i*4+1]+.114*d.data[i*4+2];return g}
+function fromG(g,w,h){const d=new ImageData(w,h);for(let i=0;i<g.length;i++){const v=cl(g[i]);d.data[i*4]=d.data[i*4+1]=d.data[i*4+2]=v;d.data[i*4+3]=255}return d}
+// generic neighbourhood op on a gray plane; f(window array)->value
+function nb(g,w,h,k,f){const o=new Float32Array(g.length),r=k>>1,a=[];for(let y=0;y<h;y++)for(let x=0;x<w;x++){a.length=0;for(let j=-r;j<=r;j++){const yy=Math.min(h-1,Math.max(0,y+j));for(let i=-r;i<=r;i++)a.push(g[yy*w+Math.min(w-1,Math.max(0,x+i))])}o[y*w+x]=f(a)}return o}
+function gk(k){const s=.3*((k-1)*.5-1)+.8,r=k>>1,v=[];let t=0;for(let j=-r;j<=r;j++)for(let i=-r;i<=r;i++){const e=Math.exp(-(i*i+j*j)/(2*s*s));v.push(e);t+=e}return v.map(e=>e/t)}
+const med=a=>{a.sort((p,q)=>p-q);return a[a.length>>1]},avg=a=>a.reduce((p,q)=>p+q,0)/a.length;
+function planes(d){const n=d.width*d.height,p=[0,1,2].map(c=>{const a=new Float32Array(n);for(let i=0;i<n;i++)a[i]=d.data[i*4+c];return a});return p}
+function fromP(p,w,h){const d=new ImageData(w,h);for(let i=0;i<w*h;i++){d.data[i*4]=cl(p[0][i]);d.data[i*4+1]=cl(p[1][i]);d.data[i*4+2]=cl(p[2][i]);d.data[i*4+3]=255}return d}
+function filt(d,t,k){const w=d.width,h=d.height,K=gk(k);const f={g:a=>a.reduce((s,v,i)=>s+v*K[i],0),m:med,a:avg}[t];return fromP(planes(d).map(p=>nb(p,w,h,k,f)),w,h)}
+function sharpen(d){const w=d.width,h=d.height,S=[0,-1,0,-1,5,-1,0,-1,0];return fromP(planes(d).map(p=>nb(p,w,h,3,a=>a.reduce((s,v,i)=>s+v*S[i],0))),w,h)}
+function sobel(g,w,h){const X=[-1,0,1,-2,0,2,-1,0,1],Y=[-1,-2,-1,0,0,0,1,2,1],gx=nb(g,w,h,3,a=>a.reduce((s,v,i)=>s+v*X[i],0)),gy=nb(g,w,h,3,a=>a.reduce((s,v,i)=>s+v*Y[i],0)),m=gx.map((v,i)=>Math.hypot(v,gy[i]));return{gx,gy,m}}
+function canny(g,w,h,lo,hi){const b=nb(g,w,h,5,a=>a.reduce((s,v,i)=>s+v*G5[i],0)),{gx,gy,m}=sobel(b,w,h),n=new Float32Array(m.length);
+for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x;let an=Math.atan2(gy[i],gx[i])*180/Math.PI;an=(an+180)%180;let a,c;if(an<22.5||an>=157.5){a=m[i-1];c=m[i+1]}else if(an<67.5){a=m[i-w+1];c=m[i+w-1]}else if(an<112.5){a=m[i-w];c=m[i+w]}else{a=m[i-w-1];c=m[i+w+1]}n[i]=m[i]>=a&&m[i]>=c?m[i]:0}
+const o=new Uint8Array(m.length),st=[];for(let i=0;i<n.length;i++)if(n[i]>=hi){o[i]=255;st.push(i)}
+while(st.length){const i=st.pop();for(let j=-1;j<=1;j++)for(let q=-1;q<=1;q++){const p=i+j*w+q;if(p>=0&&p<n.length&&!o[p]&&n[p]>=lo){o[p]=255;st.push(p)}}}return o}
+const G5=gk(5);
+function bin(a,w,h){return fromG(a,w,h)}
+function morph(b,w,h,k,mx){const r=k>>1,o=new Uint8Array(b.length);for(let y=0;y<h;y++)for(let x=0;x<w;x++){let v=mx?0:255;for(let j=-r;j<=r;j++)for(let i=-r;i<=r;i++){const yy=y+j,xx=x+i;if(yy<0||xx<0||yy>=h||xx>=w)continue;const p=b[yy*w+xx];v=mx?Math.max(v,p):Math.min(v,p)}o[y*w+x]=v}return o}
+function noisy(d,t,amt,seed){const o=clone(d),r=rnd(seed),n=o.data.length/4;for(let i=0;i<n;i++){if(t=='g'){const s=amt*.6,z=Math.sqrt(-2*Math.log(r()+1e-9))*Math.cos(6.283*r())*s;for(let c=0;c<3;c++)o.data[i*4+c]=cl(o.data[i*4+c]+z)}else if(r()<amt/300){const v=r()<.5?0:255;o.data[i*4]=o.data[i*4+1]=o.data[i*4+2]=v}}return o}
+function btns(id,items,cb,first){const e=$(id);items.forEach((t,i)=>{const b=document.createElement('button');b.textContent=t;b.onclick=()=>{[...e.children].forEach(x=>x.classList.remove('on'));b.classList.add('on');cb(i)};e.appendChild(b);if(i==(first||0))b.classList.add('on')})}
+const rg=(id,out,f)=>{$(id).oninput=()=>{if(out)$(out).textContent=f?f($(id).value):$(id).value;go[id]&&go[id]()}};
+function lab(vals,fn){vals.forEach(([i,o,f])=>{$(i).addEventListener('input',()=>{if(o)$(o).textContent=f?f($(i).value):$(i).value;fn()});if(o)$(o).textContent=f?f($(i).value):$(i).value})}
+const go={};
+
+function init(d){SRC=d;W=d.width;H=d.height;
+put($('h1'),d);const g=toG(d);put($('h2'),fromG(g,W,H));put($('h3'),filt(d,'g',5));put($('h4'),bin(canny(g,W,H,30,90),W,H));
+put($('pxc'),d);put($('c1'),noisy(d,'g',45,3));
+put($('b1'),d);put($('n3'),d);put($('f1'),NF());
+chan();tfm();bc();nm();nz();fl();th();ed();pipe();
+}
+let NFc=null;function NF(){return NFc=noisy(SRC,'g',40,5)}
+
+// pixel explorer
+const pc=$('pxc');function px(e){const r=pc.getBoundingClientRect(),t=e.touches?e.touches[0]:e,x=Math.floor((t.clientX-r.left)/r.width*W),y=Math.floor((t.clientY-r.top)/r.height*H);if(x<0||y<0||x>=W||y>=H)return;const D=SRC.data,i=(y*W+x)*4;
+$('pxi').textContent=`x = ${x}  y = ${y}   (img[${y}, ${x}])\nRGB = [${D[i]}, ${D[i+1]}, ${D[i+2]}]\nBGR = [${D[i+2]}, ${D[i+1]}, ${D[i]}]  (OpenCV order)\nshape = (${H}, ${W}, 3)   pixels = ${W*H}`;
+const z=$('pz').getContext('2d');z.clearRect(0,0,126,126);let m='Gray values (5×5):\n';const gg=toG(SRC);
+for(let j=-4;j<=4;j++)for(let k=-4;k<=4;k++){const xx=Math.min(W-1,Math.max(0,x+k)),yy=Math.min(H-1,Math.max(0,y+j)),q=(yy*W+xx)*4;z.fillStyle=`rgb(${D[q]},${D[q+1]},${D[q+2]})`;z.fillRect((k+4)*14,(j+4)*14,14,14);z.strokeStyle='rgba(255,255,255,.35)';z.strokeRect((k+4)*14,(j+4)*14,14,14)}
+z.strokeStyle='#fff';z.lineWidth=2;z.strokeRect(56,56,14,14);z.lineWidth=1;
+for(let j=-2;j<=2;j++){m+='[';for(let k=-2;k<=2;k++){const xx=Math.min(W-1,Math.max(0,x+k)),yy=Math.min(H-1,Math.max(0,y+j));m+=String(Math.round(gg[yy*W+xx])).padStart(4)}m+=' ]\n'}$('pm').textContent=m}
+pc.onmousemove=px;pc.onclick=px;pc.ontouchmove=px;
+
+// channels
+let chm=0;btns('chb',['Original','Red','Green','Blue','Grayscale'],i=>{chm=i;chan()});
+function chan(){const o=new ImageData(W,H),D=SRC.data,a=[+$('cr').value,+$('cg').value,+$('cb').value];
+for(let i=0;i<W*H*4;i+=4){const r=cl(D[i]+a[0]),g=cl(D[i+1]+a[1]),b=cl(D[i+2]+a[2]);let R=r,G=g,B=b;
+if(chm==1)G=B=r;else if(chm==2)R=B=g;else if(chm==3)R=G=b;else if(chm==4)R=G=B=.299*r+.587*g+.114*b;o.data[i]=R;o.data[i+1]=G;o.data[i+2]=B;o.data[i+3]=255}put($('chc'),o);
+$('vr').textContent=a[0];$('vg').textContent=a[1];$('vb').textContent=a[2];
+$('chn').textContent=`Pixel (90,60) RGB: [${cl(D[(60*W+90)*4]+a[0])}, ${cl(D[(60*W+90)*4+1]+a[1])}, ${cl(D[(60*W+90)*4+2]+a[2])}]\nIn OpenCV that is stored as BGR:   [B, G, R]\nGray = 0.299R + 0.587G + 0.114B (cv2.COLOR_BGR2GRAY)`}
+['cr','cg','cb'].forEach(i=>$(i).oninput=chan);
+
+// transforms
+let fH=1,fV=1;$('fh').onclick=()=>{fH*=-1;tfm()};$('fv').onclick=()=>{fV*=-1;tfm()};
+$('rs').onclick=()=>{[['s1',100],['s2',100],['s3',0],['s4',0],['s5',0]].forEach(([i,v])=>$(i).value=v);fH=fV=1;tfm()};
+function tfm(){const s=$('s1').value/100,cp=$('s2').value/100,rot=+$('s3').value,tx=+$('s4').value,ty=+$('s5').value;
+const cw=Math.round(W*cp),ch=Math.round(H*cp),sx=(W-cw)>>1,sy=(H-ch)>>1,ow=Math.round(cw*s),oh=Math.round(ch*s),c=$('t2'),x=c.getContext('2d');c.width=ow;c.height=oh;
+x.fillStyle='#000';x.fillRect(0,0,ow,oh);x.save();x.translate(ow/2+tx*s,oh/2+ty*s);x.rotate(rot*Math.PI/180);x.scale(fH,fV);x.drawImage(mk2(),sx,sy,cw,ch,-ow/2,-oh/2,ow,oh);x.restore();
+put($('t1'),SRC);$('t1d').textContent=`Before: ${W}×${H} (W×H)`;$('t2d').textContent=`After: ${ow}×${oh} (W×H)`;
+$('a1').textContent=Math.round(s*100)+'%';$('a2').textContent=Math.round(cp*100)+'%';$('a3').textContent=rot+'°';$('a4').textContent=tx;$('a5').textContent=ty;
+$('tfx').textContent=`Resize : changes pixel count, for model input sizes    cv2.resize(img,(${ow},${oh}))\nCrop   : keeps a region of interest                   img[${sy}:${sy+ch}, ${sx}:${sx+cw}]\nRotate : turns about the centre, corners fill black   cv2.warpAffine(img, cv2.getRotationMatrix2D(c,${rot},1), (w,h))\nShift  : moves content with an affine matrix          cv2.warpAffine(img, [[1,0,${tx}],[0,1,${ty}]], (w,h))\nFlip   : mirrors for data augmentation                cv2.flip(img, ${fH<0&&fV<0?-1:fH<0?1:fV<0?0:'1 or 0'})`}
+function mk2(){const c=mk(W,H);c.getContext('2d').putImageData(SRC,0,0);return c}
+['s1','s2','s3','s4','s5'].forEach(i=>$(i).oninput=tfm);
+
+// brightness/contrast
+function bc(){const a=$('bas').value/100,b=+$('bbs').value,o=clone(SRC),hs=new Array(256).fill(0);for(let i=0;i<o.data.length;i+=4){for(let c=0;c<3;c++)o.data[i+c]=cl(a*o.data[i+c]+b);hs[Math.round(.299*o.data[i]+.587*o.data[i+1]+.114*o.data[i+2])]++}
+put($('b2'),o);const h=$('bh').getContext('2d');h.clearRect(0,0,256,80);const mx=Math.max(...hs);h.fillStyle='#5eb3ff';hs.forEach((v,i)=>h.fillRect(i,80-v/mx*78,1,v/mx*78));
+$('ba').textContent=a.toFixed(2);$('bb').textContent=b;const v=100;$('bf').textContent=`input 100 → ${a.toFixed(2)} × 100 + ${b} = ${cl(a*v+b).toFixed(0)}\ninput 200 → ${a.toFixed(2)} × 200 + ${b} = ${cl(a*200+b).toFixed(0)}\ngap 100 → ${(cl(a*200+b)-cl(a*v+b)).toFixed(0)} (was 100)`}
+['bas','bbs'].forEach(i=>$(i).oninput=bc);
+
+// normalise
+function nm(){const x0=+$('nx').value,y0=+$('ny').value,g=toG(SRC),m=$('nm').value,v=[];for(let j=0;j<5;j++)for(let i=0;i<5;i++)v.push(Math.round(g[(y0+j)*W+x0+i]));
+let mean=0,sd=0;g.forEach(q=>mean+=q);mean/=g.length;g.forEach(q=>sd+=(q-mean)**2);sd=Math.sqrt(sd/g.length);
+const f=q=>m=='a'?(q/255).toFixed(3):((q-mean)/sd).toFixed(2),fm=a=>{let s='';a.forEach((q,i)=>{s+=String(q).padStart(7)+((i+1)%5?'':'\n')});return s};
+$('n1').textContent='BEFORE  uint8 (0–255)\n'+fm(v);$('n2').textContent='AFTER  float32 '+(m=='a'?'(x/255)':`(x−${mean.toFixed(1)})/${sd.toFixed(1)}`)+'\n'+fm(v.map(f));$('nxv').textContent=x0;$('nyv').textContent=y0}
+['nx','ny','nm'].forEach(i=>$(i).oninput=nm);
+
+// noise
+function nz(){const a=+$('ni').value;put($('n4'),noisy(SRC,$('nt').value,a,9));$('nv').textContent=a}
+['ni','nt'].forEach(i=>$(i).oninput=nz);
+
+// filters
+let fm_='o';document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-f]').forEach(x=>x.classList.remove('on'));b.classList.add('on');fm_=b.dataset.f;fl()});
+const FN={o:'Original (noisy)',g:'Gaussian blur: weighted average, cv2.GaussianBlur(img,(k,k),0). Best for Gaussian-like noise.',m:'Median blur: middle value of the window, cv2.medianBlur(img,k). Best for salt-and-pepper, keeps edges.',a:'Average blur: plain mean, cv2.blur(img,(k,k)). Fast, but blurs edges evenly.',s:'Sharpen: kernel [[0,-1,0],[-1,5,-1],[0,-1,0]] via cv2.filter2D. Amplifies edges and noise.'};
+function fl(){const k=+$('fk').value*2+1;$('fv2').textContent=k+'×'+k;const d=NFc||NF();put($('f2'),fm_=='o'?d:fm_=='s'?sharpen(d):filt(d,fm_,k));$('fc').textContent=fm_=='o'?'Original':'Filtered';$('ft').textContent=FN[fm_]+'\n\nNOISY IMAGE → FILTER → CLEANER IMAGE'}
+$('fk').oninput=fl;
+
+// threshold
+function th(){const t=+$('ts').value,m=$('tm').value,g=toG(SRC),o=new Float32Array(g.length);
+if(m=='a'){const b=nb(g,W,H,15,avg);for(let i=0;i<g.length;i++)o[i]=g[i]>b[i]-7?255:0}else for(let i=0;i<g.length;i++)o[i]=(m=='b'?g[i]>t:g[i]<=t)?255:0;
+put($('th1'),fromG(g,W,H));put($('th2'),fromG(o,W,H));$('tv').textContent=m=='a'?'n/a':t;const p=g[60*W+90];
+$('tt').textContent=m=='a'?'Each pixel is compared with the mean of its 15×15 neighbourhood minus C=7. Works under uneven lighting.':`pixel (90,60) intensity = ${Math.round(p)}\n${Math.round(p)} ${m=='b'?'>':'≤'} ${t} ?  ${o[60*W+90]?'yes':'no'}  →  ${o[60*W+90]}`}
+['ts','tm'].forEach(i=>$(i).oninput=th);
+
+// edges
+let em=0;btns('eb',['Sobel X','Sobel Y','Gradient','Canny'],i=>{em=i;ed()},3);
+function ed(){const g=toG(SRC);put($('e1'),fromG(g,W,H));let o;const lo=+$('el').value,hi=Math.max(lo,+$('eh').value);$('elv').textContent=lo;$('ehv').textContent=hi;
+if(em==3)o=Float32Array.from(canny(g,W,H,lo,hi));else{const s=sobel(nb(g,W,H,3,avg),W,H);o=(em==0?s.gx:em==1?s.gy:s.m).map(v=>Math.abs(v)/(em==2?2:1))}
+put($('e2'),fromG(o,W,H));$('ec').textContent=['Sobel X (vertical edges)','Sobel Y (horizontal edges)','Gradient magnitude','Canny edge map'][em]}
+['el','eh'].forEach(i=>$(i).oninput=ed);
+
+// morphology
+const MW=160,MH=110;let MB=(()=>{const c=mk(MW,MH),x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,MW,MH);x.fillStyle='#fff';x.fillRect(15,20,50,70);x.beginPath();x.arc(115,55,32,0,7);x.fill();x.fillStyle='#000';x.fillRect(30,45,3,3);x.fillRect(45,70,3,3);x.fillRect(110,50,3,3);x.fillRect(120,62,4,4);const d=x.getImageData(0,0,MW,MH),r=rnd(11),b=new Uint8Array(MW*MH);for(let i=0;i<b.length;i++){b[i]=d.data[i*4]>128?255:0;if(!b[i]&&r()<.012)b[i]=255}return b})();
+let mm=0;btns('mb',['Erosion','Dilation','Opening','Closing'],i=>{mm=i;mo()});
+function mo(){const k=+$('mk').value*2+1;$('mkv').textContent=k+'×'+k;let o;if(mm==0)o=morph(MB,MW,MH,k,0);else if(mm==1)o=morph(MB,MW,MH,k,1);else if(mm==2)o=morph(morph(MB,MW,MH,k,0),MW,MH,k,1);else o=morph(morph(MB,MW,MH,k,1),MW,MH,k,0);
+put($('m1'),bin(MB,MW,MH));put($('m2'),bin(o,MW,MH));
+const c=$('mkc').getContext('2d');c.fillStyle='#070a11';c.fillRect(0,0,90,90);const s=90/k;c.fillStyle='#5eb3ff';for(let i=0;i<k;i++)for(let j=0;j<k;j++)c.fillRect(i*s+1,j*s+1,s-2,s-2);
+$('mc').textContent=['Erosion','Dilation','Opening (erode, then dilate)','Closing (dilate, then erode)'][mm];
+$('mt').textContent=['Erosion: shrinks foreground; a pixel stays white only if the whole kernel fits. cv2.erode','Dilation: expands foreground; fills small gaps. cv2.dilate','Opening: removes small white specks (noise). cv2.morphologyEx(..., cv2.MORPH_OPEN, k)','Closing: fills small black holes. cv2.morphologyEx(..., cv2.MORPH_CLOSE, k)'][mm]+'\nKernel shown at left (all ones).'}
+$('mk').oninput=mo;mo();
+
+// pipeline
+const PS=[['Raw image','Starting point: whatever the camera delivered (BGR uint8).','cv2.imread(path)','Any project start.'],['Resize','Fixed size so every image has the same shape (here 120×90).','cv2.resize(img,(w,h),interpolation=cv2.INTER_AREA)','Model input sizes like 224×224.'],['Colour conversion','Drop to one channel when colour is not needed.','cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)','Edge or threshold pipelines.'],['Normalization','Scale 0–255 to 0–1 (float32). Display is unchanged because only the range changed.','img.astype("float32")/255.0','Feeding neural networks.'],['Noise reduction','Gaussian blur to suppress grain before gradients.','cv2.GaussianBlur(g,(5,5),0)','Low-light or high-ISO photos.'],['Contrast / brightness','Stretch contrast so structure stands out.','cv2.convertScaleAbs(g,alpha=1.4,beta=-20)','Dim or flat images.'],['Threshold / edges','Reduce to a binary or edge map: structure only.','cv2.Canny(g,30,90)','Shape-based analysis.'],['Morphology','Dilate to join broken edge pieces.','cv2.dilate(e,np.ones((3,3)))','Cleaning masks and edge maps.'],['Processed image / ML','Result goes to a classical algorithm or is converted to a tensor for a model.','tensor = torch.from_numpy(x)','Model input; keep training-time preprocessing identical.']];
+let PC=[];function pipeBuild(){const c=mk(120,90).getContext('2d');c.drawImage(mk2(),0,0,120,90);const d=c.getImageData(0,0,120,90),w=120,h=90;PC=[];PC.push(SRC);PC.push(d);let g=toG(d);PC.push(fromG(g,w,h));PC.push(PC[2]);g=nb(g,w,h,5,a=>a.reduce((s,v,i)=>s+v*G5[i],0));PC.push(fromG(g,w,h));g=g.map(v=>cl(1.4*v-20));PC.push(fromG(g,w,h));const e=canny(g,w,h,30,90);PC.push(bin(e,w,h));const dd=morph(e,w,h,3,1);PC.push(bin(dd,w,h));PC.push(PC[7])}
+function pipe(){pipeBuild();const b=$('pb');b.innerHTML='';PS.forEach((s,i)=>{const e=document.createElement('button');e.textContent=s[0];e.onclick=()=>{[...b.querySelectorAll('button')].forEach(x=>x.classList.remove('on'));e.classList.add('on');ps(i)};b.appendChild(e);if(i<8){const a=document.createElement('i');a.textContent='→';a.style.color='var(--ac)';b.appendChild(a)}});b.querySelector('button').click()}
+function ps(i){const s=PS[i];put($('p1'),PC[i]);const c=$('p1');c.style.imageRendering=i?'pixelated':'auto';$('pt').innerHTML=`<h3 style="margin:0">${i+1}. ${s[0]}</h3><p><b>Purpose / explanation:</b> ${s[1]}</p><p><b>OpenCV:</b> <code>${s[2]}</code></p><p><b>Use case:</b> ${s[3]}</p>`}
+
+// code tabs
+const CD={'Read Image':['import cv2\nimg = cv2.imread("image.jpg")\nprint(img.shape, img.dtype)','imread returns a NumPy array in BGR order: (height, width, 3), uint8. It returns None if the path is wrong.'],
+Grayscale:['gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)','Use BGR2GRAY (not RGB2GRAY) because OpenCV images are BGR.'],
+Resize:['small = cv2.resize(img, (320, 240))','Size is (width, height). Use INTER_AREA when shrinking.'],
+Crop:['roi = img[50:200, 100:300]','NumPy slicing is [rows (y), columns (x)].'],
+Rotate:['h, w = img.shape[:2]\nM = cv2.getRotationMatrix2D((w/2, h/2), 45, 1.0)\nrot = cv2.warpAffine(img, M, (w, h))','Rotate 45° about the centre, scale 1.0. For 90° steps use cv2.rotate.'],
+Brightness:['bright = cv2.convertScaleAbs(img, alpha=1.0, beta=40)','beta adds to every pixel; the result is clipped to 0–255.'],
+Contrast:['contrast = cv2.convertScaleAbs(img, alpha=1.5, beta=0)','alpha multiplies pixel values; >1 raises contrast.'],
+'Gaussian Blur':['blur = cv2.GaussianBlur(img, (5, 5), 0)','Kernel size must be odd; sigma 0 means it is derived from the size.'],
+'Median Blur':['med = cv2.medianBlur(img, 5)','Replaces each pixel with the window median, ideal for salt-and-pepper noise.'],
+Threshold:['_, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)','Pixels above 127 become 255, others 0. Add THRESH_OTSU (with T=0) to choose T automatically.'],
+'Adaptive Threshold':['ad = cv2.adaptiveThreshold(gray, 255,\n  cv2.ADAPTIVE_THRESH_MEAN_C,\n  cv2.THRESH_BINARY, 15, 7)','Each pixel is compared to its 15×15 local mean minus 7.'],
+Canny:['edges = cv2.Canny(gray, 50, 150)','Pixels above 150 are strong edges; those between 50 and 150 survive only if connected to strong ones.'],
+Erosion:['import numpy as np\nk = np.ones((3, 3), np.uint8)\neroded = cv2.erode(binary, k)','White regions shrink; small specks vanish.'],
+Dilation:['dilated = cv2.dilate(binary, k)','White regions grow; small gaps close.']};
+btns('cb2',Object.keys(CD),i=>{const k=Object.keys(CD)[i];$('cx').textContent=CD[k][0];$('ce').textContent=CD[k][1]});$('cx').textContent=CD['Read Image'][0];$('ce').textContent=CD['Read Image'][1];
+
+// challenge
+const ST=['Edge detection','Contrast adjustment','Resize','Noise reduction','Grayscale'],ANS=['Resize','Grayscale','Noise reduction','Contrast adjustment','Edge detection'];let ch=[];
+function cbuild(){const e=$('cs');e.innerHTML='';ST.forEach(s=>{const b=document.createElement('button');b.textContent=s;b.style.margin='3px';b.onclick=()=>{if(!ch.includes(s)){ch.push(s);b.classList.add('on');$('co').textContent='Your order: '+ch.join(' → ')}};e.appendChild(b)})}
+$('cc').onclick=()=>{const ok=ch.join()==ANS.join();$('cf').innerHTML=`<p>${ch.length<5?'Select all five steps first.':ok?'Correct.':'Not quite.'}</p><p><b>Recommended:</b> ${ANS.join(' → ')}.<br>Resize first so everything later is cheaper and consistent. Grayscale removes unneeded channels. Denoise before edges, since noise creates false gradients. Adjust contrast so weak edges stand out. Edge detection is last because it throws away intensity information. The order can change per task (for example, denoising before shrinking may preserve more).</p>`};
+$('cr2').onclick=()=>{ch=[];$('co').textContent='Your order: —';$('cf').innerHTML='';cbuild()};cbuild();
+
+// upload
+$('up').onchange=e=>{const f=e.target.files[0];if(!f)return;const im=new Image();im.onload=()=>{const s=Math.min(1,240/im.width,200/im.height),w=Math.max(60,Math.round(im.width*s)),h=Math.max(60,Math.round(im.height*s)),c=mk(w,h),x=c.getContext('2d');x.drawImage(im,0,0,w,h);const d=x.getImageData(0,0,w,h);NFc=null;
+if(w<236||h<176){const c2=mk(240,180),x2=c2.getContext('2d');x2.drawImage(im,0,0,240,180);init(x2.getImageData(0,0,240,180))}else init(d);$('nx').max=W-10;$('ny').max=H-10};im.src=URL.createObjectURL(f)};
+init(scene());
+</script></body></html>
