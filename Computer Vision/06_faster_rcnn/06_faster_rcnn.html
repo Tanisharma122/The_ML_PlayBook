@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Faster R-CNN: a complete visual guide</title>
+<style>
+:root{--ink:#111;--mut:#6e6e73;--g:rgba(255,255,255,.62);--line:rgba(0,0,0,.09)}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:#f5f5f7;font:16px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(620px 420px at 8% 5%,#d9e6ff,transparent 60%),radial-gradient(520px 440px at 92% 14%,#ffe2ea,transparent 60%),radial-gradient(640px 520px at 55% 98%,#def5e6,transparent 60%)}
+.glass{background:var(--g);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);border:1px solid rgba(255,255,255,.75);box-shadow:0 10px 34px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.85);border-radius:22px}
+main{max-width:1000px;margin:auto;padding:0 20px 70px}section{margin-top:62px}
+h1{font-size:clamp(2.4rem,7.5vw,4.6rem);letter-spacing:-.04em;line-height:1;margin:0 0 14px;font-weight:700}
+h2{font-size:clamp(1.55rem,4vw,2.1rem);letter-spacing:-.03em;margin:0 0 6px;font-weight:700}
+h3{font-size:1.02rem;margin:0 0 4px}p{margin:.4em 0;max-width:70ch}.mut{color:var(--mut)}.sm{font-size:.88rem}
+.eb{font-size:.85rem;color:var(--mut);margin-bottom:4px}
+nav{position:sticky;top:12px;z-index:9;max-width:720px;margin:12px auto 0;padding:8px 18px;overflow-x:auto;white-space:nowrap;border-radius:999px}
+nav a{color:var(--ink);text-decoration:none;font-size:.86rem;margin:0 9px;opacity:.6}nav a:hover{opacity:1}
+.hero{padding:66px 0 0;text-align:center}.hero p{margin:0 auto 16px;font-size:1.12rem;color:var(--mut)}
+.pill{display:inline-block;padding:5px 14px;border-radius:999px;font-size:.8rem;background:rgba(255,255,255,.7);border:1px solid var(--line);margin:3px}
+.card{padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-top:14px}
+.row{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+button{font:inherit;font-size:.86rem;border:1px solid var(--line);background:rgba(255,255,255,.8);color:var(--ink);padding:6px 13px;border-radius:999px;cursor:pointer;margin:3px 3px 3px 0}
+button:hover{background:#fff}button.on{background:#111;color:#fff;border-color:#111}
+button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid #0071e3;outline-offset:2px}
+input[type=range]{accent-color:#111;width:170px;vertical-align:middle}
+code,pre{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}code{font-size:.88em}
+pre{margin:10px 0 0;background:#111;color:#f2f2f7;padding:15px;border-radius:14px;overflow-x:auto;font-size:.8rem;line-height:1.55}
+.f{font-family:ui-monospace,Menlo,monospace;background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:8px 0;font-size:.9rem;overflow-x:auto;white-space:pre}
+.ev{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin-top:14px}.ev .glass{flex:1 1 220px;padding:16px}.ev .ar{align-self:center;color:var(--mut);font-size:1.3rem;flex:none}
+.st{display:flex;flex-wrap:wrap;gap:4px}
+svg{max-width:100%;height:auto;border-radius:14px;background:rgba(255,255,255,.7);border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:8px 11px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-weight:500}
+details{background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:12px;padding:9px 14px;margin:7px 0}summary{cursor:pointer;font-weight:600}
+ul.l{padding-left:18px;margin:6px 0}ul.l li{margin:5px 0}a{color:#0071e3}
+.tag{display:inline-block;padding:1px 9px;border-radius:99px;font-size:.75rem;font-weight:600;color:#fff}
+</style></head><body>
+<nav class="glass"><a href="#evo">Evolution</a><a href="#arch">Pipeline</a><a href="#anc">Anchors</a><a href="#loss">Loss</a><a href="#train">Training</a><a href="#var">Variants</a><a href="#code">Code</a><a href="#qa">Self-check</a><a href="#ref">Links</a></nav>
+<main>
+<header class="hero"><div class="eb">Computer Vision · Detectors</div>
+<h1>Faster R-CNN</h1>
+<p>The classic two-stage detector. First ask "where could objects be?", then ask "what is each one, exactly where?".</p>
+<span class="pill">Two-stage</span><span class="pill">Region Proposal Network</span><span class="pill">Anchors</span><span class="pill">RoI Pooling / Align</span><span class="pill">High accuracy</span></header>
+
+<section id="evo"><div class="eb">Big picture</div><h2>From R-CNN to Faster R-CNN</h2>
+<p class="mut">Each version fixed the biggest bottleneck of the one before.</p>
+<div class="ev">
+<div class="glass"><h3>R-CNN (2014)</h3><p class="sm">Find ~2000 candidate regions with <b>Selective Search</b>, resize each, run a CNN on <b>every one</b>, classify with SVMs.</p><p class="sm mut">Problem: ~2000 CNN passes per image. Very slow.</p></div><span class="ar">→</span>
+<div class="glass"><h3>Fast R-CNN (2015)</h3><p class="sm">Run the CNN <b>once</b> on the whole image, then cut each region out of the shared feature map with <b>RoI pooling</b>.</p><p class="sm mut">Problem: Selective Search is still slow and separate.</p></div><span class="ar">→</span>
+<div class="glass"><h3>Faster R-CNN (2015)</h3><p class="sm">Replace Selective Search with a small <b>Region Proposal Network (RPN)</b> that shares the CNN features and is learned.</p><p class="sm mut">Whole detector is one trainable network.</p></div></div>
+<div class="glass card" style="margin-top:14px"><b>The one-line idea:</b> <span class="mut">shared features → learned proposals → per-region classification and box refinement. The original paper reports about 5 frames per second on a GPU with VGG-16.</span></div></section>
+
+<section id="arch"><div class="eb">Explorer</div><h2>The pipeline, stage by stage</h2>
+<p class="mut">Click a stage. Shapes use an example 800 × 800 image with a VGG-16 backbone (stride 16).</p>
+<div class="glass card" style="margin-top:12px"><div class="st" id="sb"></div>
+<div style="margin-top:12px"><h3 id="sh"></h3><p id="sp"></p><div class="f" id="ss"></div></div></div></section>
+
+<section id="anc"><div class="eb">Demo</div><h2>Anchors and the RPN</h2>
+<p class="mut">At every feature-map position the RPN considers <b>9 anchors</b> (3 scales × 3 aspect ratios). Move the position and watch which anchors would be labeled <span class="tag" style="background:#1a9e55">positive</span> (IoU &gt; 0.7 with the dashed ground-truth box), <span class="tag" style="background:#9a9aa0">negative</span> (IoU &lt; 0.3) or <span class="tag" style="background:#e8920b">ignored</span>.</p>
+<div class="glass card row" style="margin-top:12px"><svg id="av" viewBox="0 0 400 260" width="440"></svg>
+<div style="flex:1;min-width:230px"><p><label>x <input type="range" id="ax" min="30" max="370" value="200"></label></p><p><label>y <input type="range" id="ay" min="30" max="230" value="120"></label></p>
+<p id="ac" class="sm"></p>
+<div class="f">anchor w = s / √r,  h = s · √r
+scales s: 3   ratios r: 3 (1:2, 1:1, 2:1)
+k = 9 anchors per position</div>
+<p class="sm mut">800×800 image, stride 16 → 50 × 50 positions × 9 = <b>22,500 anchors</b>. The RPN outputs 2k = 18 scores and 4k = 36 offsets per position.</p></div></div>
+<div class="grid"><div class="glass card"><h3>Box regression targets</h3><div class="f">tx = (x − xa) / wa    ty = (y − ya) / ha
+tw = log(w / wa)       th = log(h / ha)</div><p class="sm mut">The network predicts these offsets from anchor <code>a</code> to the truth. Predicting a shift and a log-scale keeps values small and stable.</p></div>
+<div class="glass card"><h3>RoI Pooling vs RoIAlign</h3><p class="sm"><b>RoI Pooling</b> rounds region edges to whole feature cells, so features shift slightly.<br><b>RoIAlign</b> keeps exact coordinates and samples with bilinear interpolation. It is more precise and is standard today (introduced with Mask R-CNN).</p></div></div></section>
+
+<section id="loss"><div class="eb">Math</div><h2>The loss</h2>
+<div class="glass card"><div class="f">L = (1/Ncls) Σ Lcls(pi, pi*)  +  λ (1/Nreg) Σ pi* · Lreg(ti, ti*)</div>
+<p class="sm"><b>pi</b> = predicted object probability, <b>pi*</b> = 1 for positive anchors, 0 for negative. The regression term only counts positives. The same structure is used again in the detection head, with a class instead of object/background.</p>
+<div class="row"><div style="flex:1;min-width:230px"><div class="f">smooth_L1(x) = 0.5·x²      if |x| &lt; 1
+               |x| − 0.5   otherwise</div><p class="sm mut">Smooth L1 acts like L2 near zero (smooth gradient) and like L1 for big errors, so outliers do not dominate training.</p></div><svg id="sl" viewBox="0 0 300 150" width="300"></svg></div></div></section>
+
+<section id="train"><div class="eb">Details</div><h2>Training and inference</h2>
+<div class="grid">
+<div class="glass card"><h3>RPN training</h3><ul class="l sm"><li>Positive anchor: IoU &gt; 0.7 with a truth box (or the best anchor for that box)</li><li>Negative: IoU &lt; 0.3 with all boxes</li><li>Sample 256 anchors per image, up to a 1:1 positive:negative ratio</li><li>Anchors crossing the image border are ignored in training</li></ul></div>
+<div class="glass card"><h3>Detection head training</h3><ul class="l sm"><li>Proposals with IoU ≥ 0.5 to a truth box are foreground, labeled with that box's class</li><li>Lower-IoU proposals are background</li><li>Sample a fixed number per image with about 25% foreground</li></ul></div>
+<div class="glass card"><h3>Joint training</h3><p class="sm">The paper first used a 4-step alternating scheme (train RPN, train detector, share layers, fine-tune). Modern code trains <b>end to end</b> with the combined loss.</p></div>
+<div class="glass card"><h3>Inference</h3><ul class="l sm"><li>RPN proposals → NMS (IoU 0.7) → keep a few hundred</li><li>Head scores each proposal, refines boxes</li><li>Score threshold, then per-class NMS</li></ul></div></div></section>
+
+<section id="var"><div class="eb">Beyond</div><h2>Variants and comparison</h2>
+<div class="grid">
+<div class="glass card"><h3>FPN</h3><p class="sm">A feature pyramid with strong meaning at every scale. Proposals are assigned to the level that fits their size. Big gain for small objects. Standard setup: ResNet-50 + FPN.</p></div>
+<div class="glass card"><h3>Mask R-CNN</h3><p class="sm">Adds a mask branch (and RoIAlign) for instance segmentation; also used for keypoints.</p></div>
+<div class="glass card"><h3>Cascade R-CNN</h3><p class="sm">Several heads with rising IoU thresholds for sharper localization.</p></div></div>
+<div class="glass card" style="margin-top:14px"><table><tr><th></th><th>Faster R-CNN</th><th>SSD</th><th>YOLO</th></tr>
+<tr><td>Stages</td><td>Two</td><td>One</td><td>One</td></tr>
+<tr><td>Strength</td><td>Accuracy, small and crowded objects</td><td>Multi-scale, fast</td><td>Speed, tooling, edge use</td></tr>
+<tr><td>Weakness</td><td>Slower, heavier</td><td>Tiny objects</td><td>Older versions: tiny or crowded objects</td></tr>
+<tr><td>Pick when</td><td>Accuracy first, offline analysis, research baseline</td><td>Mobile with a light backbone</td><td>Real-time video, edge devices</td></tr></table></div></section>
+
+<section id="code"><div class="eb">Examples</div><h2>Run it with torchvision</h2>
+<div class="glass card"><div id="tb"></div><pre id="cd"></pre><p class="sm mut">Pretrained on COCO (80 categories). Install: <code>pip install torch torchvision</code>. Label <code>0</code> is background, so real classes start at 1, and boxes are absolute <code>xyxy</code> pixels.</p></div></section>
+
+<section id="qa"><div class="eb">Revise</div><h2>Self-check</h2>
+<details><summary>Why is it called two-stage?</summary>Stage 1 (the RPN) proposes regions that may hold objects. Stage 2 classifies each proposal and refines its box.</details>
+<details><summary>What does the RPN output at each position?</summary>For k anchors: 2k objectness scores (object or background) and 4k box offsets.</details>
+<details><summary>How are RPN anchors labeled?</summary>Positive if IoU &gt; 0.7 with a truth box (or best match), negative if IoU &lt; 0.3, the rest ignored.</details>
+<details><summary>Why share the backbone between RPN and head?</summary>Features are computed once, so proposals are almost free compared with Selective Search, and both parts learn from the same features.</details>
+<details><summary>RoI Pooling vs RoIAlign?</summary>Pooling quantizes coordinates and causes misalignment. RoIAlign uses bilinear sampling at exact positions.</details>
+<details><summary>Why smooth L1 for boxes?</summary>Gentle near zero and linear for large errors, so it is less sensitive to outliers than L2.</details>
+<details><summary>When would you choose it over YOLO?</summary>When accuracy and localization quality matter more than speed, or for small and crowded objects on a capable GPU.</details>
+<details><summary>Common mistakes</summary>Using label 0 for a real class; wrong box format; forgetting <code>model.eval()</code>; not replacing the head when your class count differs from COCO; expecting real-time speed on a CPU.</details></section>
+
+<section id="ref"><div class="eb">Go deeper</div><h2>References</h2>
+<div class="grid">
+<div class="glass card"><h3>The papers</h3><ul class="l sm">
+<li><a href="https://arxiv.org/abs/1506.01497" target="_blank" rel="noopener">Faster R-CNN</a></li>
+<li><a href="https://arxiv.org/abs/1504.08083" target="_blank" rel="noopener">Fast R-CNN</a></li>
+<li><a href="https://arxiv.org/abs/1311.2524" target="_blank" rel="noopener">R-CNN</a></li>
+<li><a href="https://arxiv.org/abs/1612.03144" target="_blank" rel="noopener">Feature Pyramid Networks</a></li>
+<li><a href="https://arxiv.org/abs/1703.06870" target="_blank" rel="noopener">Mask R-CNN</a></li></ul></div>
+<div class="glass card"><h3>Practice</h3><ul class="l sm">
+<li><a href="https://pytorch.org/vision/stable/models.html" target="_blank" rel="noopener">Torchvision models</a> (object detection section)</li>
+<li><a href="https://cocodataset.org" target="_blank" rel="noopener">COCO dataset</a></li>
+<li><a href="https://docs.voxel51.com/getting_started/object_detection/index.html" target="_blank" rel="noopener">FiftyOne object detection guide</a></li></ul></div></div>
+<p class="mut sm" style="margin-top:18px">Next: compare it with SSD and YOLO on your own images.</p></section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const ST=[["1 Input image","The image is resized so its shorter side is a fixed length, then normalized.","image: 800 × 800 × 3"],
+["2 Backbone CNN","A CNN (VGG-16 in the paper, usually ResNet+FPN today) turns the image into a feature map. Both stages share it.","feature map: 50 × 50 × 512   (stride 16)"],
+["3 Region Proposal Network","A 3×3 conv slides over the feature map, then two 1×1 convs predict objectness and box offsets for every anchor.","cls: 50 × 50 × 18    reg: 50 × 50 × 36\n= 22,500 anchors scored"],
+["4 Proposals + NMS","Apply offsets to anchors, clip to the image, drop tiny boxes, run NMS at IoU 0.7, keep the top few hundred (up to ~2000 in training).","≈ 300 proposals × (x1, y1, x2, y2)"],
+["5 RoI Pooling / Align","Each proposal is cut from the shared feature map and resized to a fixed grid, so every region has the same shape.","N × 7 × 7 × 512\n(each region → 25,088 numbers)"],
+["6 Detection head","Fully connected layers produce class scores (including background) and class-specific box refinements.","FC 4096 → FC 4096\nscores: N × (C+1)   boxes: N × 4C"],
+["7 Post-processing","Drop low scores, decode the refined boxes, run NMS per class (0.5 by default in torchvision), return the final detections.","boxes, labels, scores"]];
+ST.forEach((s,i)=>{const b=document.createElement("button");b.textContent=s[0].split(" ").slice(0,2).join(" ");b.onclick=()=>{$("#sh").textContent=s[0];$("#sp").textContent=s[1];$("#ss").textContent=s[2];[...$("#sb").children].forEach(x=>x.classList.toggle("on",x===b))};$("#sb").appendChild(b);if(!i)b.click()});
+const GT=[150,70,110,100];
+function iou(a,b){const x=Math.max(0,Math.min(a[0]+a[2],b[0]+b[2])-Math.max(a[0],b[0])),y=Math.max(0,Math.min(a[1]+a[3],b[1]+b[3])-Math.max(a[1],b[1])),i=x*y;return i/(a[2]*a[3]+b[2]*b[3]-i)}
+function anchors(){const cx=+$("#ax").value,cy=+$("#ay").value;let h=`<rect width="400" height="260" fill="none"/><rect x="${GT[0]}" y="${GT[1]}" width="${GT[2]}" height="${GT[3]}" fill="rgba(0,0,0,.05)" stroke="#111" stroke-width="2" stroke-dasharray="6 4"/>`,p=0,n=0,g=0;
+for(const s of[40,90,160])for(const r of[.5,1,2]){const w=s/Math.sqrt(r),hh=s*Math.sqrt(r),a=[cx-w/2,cy-hh/2,w,hh],i=iou(a,GT),c=i>.7?"#1a9e55":i<.3?"#9a9aa0":"#e8920b";i>.7?p++:i<.3?n++:g++;h+=`<rect x="${a[0]}" y="${a[1]}" width="${w}" height="${hh}" fill="none" stroke="${c}" stroke-width="${i>.7?3:1.4}" opacity="${i<.3?.55:1}"/>`}
+$("#av").innerHTML=h+`<circle cx="${cx}" cy="${cy}" r="4" fill="#111"/>`;$("#ac").innerHTML=`<b style="color:#1a9e55">${p} positive</b> · <b style="color:#e8920b">${g} ignored</b> · <b style="color:#6e6e73">${n} negative</b>`}
+$("#ax").oninput=$("#ay").oninput=anchors;anchors();
+(function(){let a="",b="";for(let x=-3;x<=3.01;x+=.1){const X=150+x*45,s=Math.abs(x)<1?.5*x*x:Math.abs(x)-.5,q=Math.min(.5*x*x,3.2);a+=(a?"L":"M")+X+" "+(130-s*38);b+=(b?"L":"M")+X+" "+(130-q*38)}
+$("#sl").innerHTML=`<path d="M10 130H290M150 10V135" stroke="#bbb"/><path d="${b}" fill="none" stroke="#aaa" stroke-dasharray="4 3"/><path d="${a}" fill="none" stroke="#111" stroke-width="2.5"/><text x="12" y="20" font-size="11" fill="#111">smooth L1</text><text x="12" y="34" font-size="11" fill="#999">L2 (dashed)</text>`})();
+const C={"Inference":`import torch
+from torchvision.io import read_image
+from torchvision.models.detection import (
+    fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights)
+
+w = FasterRCNN_ResNet50_FPN_Weights.DEFAULT
+model = fasterrcnn_resnet50_fpn(weights=w).eval()
+prep = w.transforms()
+
+img = read_image("street.jpg")
+with torch.no_grad():
+    out = model([prep(img)])[0]          # boxes (xyxy), labels, scores
+
+keep = out["scores"] > 0.5
+names = [w.meta["categories"][i] for i in out["labels"][keep]]
+print(names)
+print(out["boxes"][keep])`,
+"Fine-tune":`from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+
+num_classes = 3                          # your classes + 1 background
+f = model.roi_heads.box_predictor.cls_score.in_features
+model.roi_heads.box_predictor = FastRCNNPredictor(f, num_classes)
+
+# Dataset item: (image_tensor, {"boxes": FloatTensor[N,4] xyxy,
+#                               "labels": Int64Tensor[N]})   # labels start at 1
+model.train()
+opt = torch.optim.SGD(model.parameters(), lr=0.005, momentum=0.9, weight_decay=5e-4)
+for images, targets in loader:
+    losses = model(images, targets)      # dict: classifier, box_reg, objectness, rpn_box_reg
+    loss = sum(losses.values())
+    opt.zero_grad(); loss.backward(); opt.step()`,
+"Draw boxes":`import cv2
+im = cv2.imread("street.jpg")
+for (x1, y1, x2, y2), name in zip(out["boxes"][keep].int().tolist(), names):
+    cv2.rectangle(im, (x1, y1), (x2, y2), (0, 255, 0), 2)
+    cv2.putText(im, name, (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, .6, (0, 255, 0), 2)
+cv2.imwrite("out.jpg", im)
+# if the preprocessing resized the image, scale boxes back first`};
+Object.keys(C).forEach((k,i)=>{const b=document.createElement("button");b.textContent=k;b.onclick=()=>{$("#cd").textContent=C[k];[...$("#tb").children].forEach(x=>x.classList.toggle("on",x===b))};$("#tb").appendChild(b);if(!i)b.click()});
+</script></body></html>
