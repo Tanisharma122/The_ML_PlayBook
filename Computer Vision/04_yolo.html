@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YOLO: a complete visual guide</title>
+<style>
+:root{--ink:#111;--mut:#6e6e73;--g:rgba(255,255,255,.62);--line:rgba(0,0,0,.09)}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:#f5f5f7;font:16px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(620px 420px at 8% 5%,#d9e6ff,transparent 60%),radial-gradient(520px 440px at 92% 14%,#ffe2ea,transparent 60%),radial-gradient(640px 520px at 55% 98%,#def5e6,transparent 60%)}
+.glass{background:var(--g);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);border:1px solid rgba(255,255,255,.75);box-shadow:0 10px 34px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.85);border-radius:22px}
+main{max-width:1000px;margin:auto;padding:0 20px 70px}section{margin-top:62px}
+h1{font-size:clamp(2.6rem,8vw,5rem);letter-spacing:-.04em;line-height:1;margin:0 0 14px;font-weight:700}
+h2{font-size:clamp(1.55rem,4vw,2.1rem);letter-spacing:-.03em;margin:0 0 6px;font-weight:700}
+h3{font-size:1.02rem;margin:0 0 4px}p{margin:.4em 0;max-width:70ch}.mut{color:var(--mut)}.sm{font-size:.88rem}
+.eb{font-size:.85rem;color:var(--mut);margin-bottom:4px}
+nav{position:sticky;top:12px;z-index:9;max-width:740px;margin:12px auto 0;padding:8px 18px;overflow-x:auto;white-space:nowrap;border-radius:999px}
+nav a{color:var(--ink);text-decoration:none;font-size:.86rem;margin:0 9px;opacity:.6}nav a:hover{opacity:1}
+.hero{padding:66px 0 0;text-align:center}.hero p{margin:0 auto 16px;font-size:1.12rem;color:var(--mut)}
+.pill{display:inline-block;padding:5px 14px;border-radius:999px;font-size:.8rem;background:rgba(255,255,255,.7);border:1px solid var(--line);margin:3px}
+.card{padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-top:14px}
+.row{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+button{font:inherit;font-size:.86rem;border:1px solid var(--line);background:rgba(255,255,255,.8);color:var(--ink);padding:6px 13px;border-radius:999px;cursor:pointer;margin:3px 3px 3px 0}
+button:hover{background:#fff}button.on{background:#111;color:#fff;border-color:#111}
+button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid #0071e3;outline-offset:2px}
+input[type=range]{accent-color:#111;width:160px;vertical-align:middle}
+code,pre{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}code{font-size:.88em}
+pre{margin:10px 0 0;background:#111;color:#f2f2f7;padding:15px;border-radius:14px;overflow-x:auto;font-size:.8rem;line-height:1.55}
+.f{font-family:ui-monospace,Menlo,monospace;background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:8px 0;font-size:.88rem;overflow-x:auto;white-space:pre}
+svg{max-width:100%;height:auto;border-radius:14px;background:rgba(255,255,255,.7);border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:8px 11px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-weight:500}
+details{background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:12px;padding:9px 14px;margin:7px 0}summary{cursor:pointer;font-weight:600}
+ul.l{padding-left:18px;margin:6px 0}ul.l li{margin:5px 0}a{color:#0071e3}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}.flow .s{padding:11px 15px;text-align:center;min-width:110px;font-size:.9rem}.flow small{display:block;color:var(--mut);font-size:.72rem}.flow .a{color:var(--mut);font-size:1.2rem}
+.bar{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:.85rem}.bar b{width:34px}.bar i{display:block;height:14px;border-radius:5px;background:#111}.bar i.l{background:#9a9aa0}
+</style></head><body>
+<nav class="glass"><a href="#idea">The idea</a><a href="#grid">Grid</a><a href="#nms">Score + NMS</a><a href="#arch">Architecture</a><a href="#evo">Versions</a><a href="#train">Training</a><a href="#code">Code</a><a href="#qa">Self-check</a><a href="#ref">Links</a></nav>
+<main>
+<header class="hero"><div class="eb">Computer Vision · Detectors</div><h1>YOLO</h1>
+<p>You Only Look Once. One look at the image, one network pass, and every object found.</p>
+<span class="pill">One-stage</span><span class="pill">Real-time</span><span class="pill">Grid prediction</span><span class="pill">Edge-friendly</span><span class="pill">Ultralytics</span></header>
+
+<section id="idea"><div class="eb">Big picture</div><h2>One look instead of many</h2>
+<div class="grid">
+<div class="glass card"><h3>Two-stage (Faster R-CNN)</h3><p class="sm">Propose regions first, then classify each one. Accurate but several steps.</p></div>
+<div class="glass card"><h3>YOLO</h3><p class="sm">Treat detection as <b>one regression problem</b>: the network reads the whole image once and outputs boxes, confidence and classes together.</p></div>
+<div class="glass card"><h3>Why that matters</h3><p class="sm">Simple, fast and trainable end to end, so it became the default for cameras, drones, robots and edge devices.</p></div></div>
+<div class="flow"><div class="glass s">Image</div><span class="a">→</span><div class="glass s">One network<small>single forward pass</small></div><span class="a">→</span><div class="glass s">Boxes + scores + classes</div><span class="a">→</span><div class="glass s">Confidence filter + NMS</div><span class="a">→</span><div class="glass s">Detections</div></div></section>
+
+<section id="grid"><div class="eb">Demo 1</div><h2>The grid: who is responsible?</h2>
+<p class="mut">YOLOv1 splits the image into an S × S grid. The cell that contains the <b>center</b> of an object is responsible for predicting it. Move the object and change the grid size.</p>
+<div class="glass card row" style="margin-top:12px"><svg id="gv" viewBox="0 0 300 300" width="320"></svg>
+<div style="flex:1;min-width:240px"><p><label>Grid S <input type="range" id="gs" min="3" max="13" value="7"> <b id="gsv">7</b></label></p>
+<p><label>Object x <input type="range" id="gx" min="50" max="250" value="170"></label></p><p><label>Object y <input type="range" id="gy" min="40" max="260" value="130"></label></p>
+<p id="gt" class="sm"></p>
+<div class="f">each cell predicts:
+  B boxes × (x, y, w, h, confidence)
+  + C class probabilities
+output = S × S × (B·5 + C)</div>
+<p class="sm mut">Paper setup: S = 7, B = 2, C = 20 (Pascal VOC) → 7 × 7 × 30. Limits of v1: each cell predicts only a few boxes and one class, so groups of tiny objects are hard.</p></div></div></section>
+
+<section id="nms"><div class="eb">Demo 2</div><h2>Scores, thresholds and NMS</h2>
+<p class="mut">The network outputs many overlapping boxes. Two filters clean them up: a <b>confidence threshold</b> and <b>Non-Maximum Suppression</b>.</p>
+<div class="glass card row" style="margin-top:12px"><svg id="nv" viewBox="0 0 340 200" width="400"></svg>
+<div style="flex:1;min-width:240px"><p><label>Confidence ≥ <input type="range" id="nc" min="5" max="95" value="25"> <b id="ncv"></b></label></p>
+<p><label>NMS IoU <input type="range" id="ni" min="10" max="90" value="50"> <b id="niv"></b></label></p>
+<p id="nt" class="sm"></p>
+<div class="f">score = Pr(class | object) × confidence
+confidence = Pr(object) × IoU(pred, truth)</div>
+<p class="sm mut"><b style="color:#111">Solid</b> = kept · <b style="color:#d64545">dashed red</b> = removed by NMS · <b style="color:#9a9aa0">gray dots</b> = below the confidence threshold. Lower the NMS IoU and more overlapping boxes disappear; raise it and duplicates survive.</p></div></div></section>
+
+<section id="arch"><div class="eb">Inside a modern YOLO</div><h2>Backbone → neck → heads</h2>
+<div class="flow"><div class="glass s">Input<small>e.g. 640 × 640</small></div><span class="a">→</span><div class="glass s">Backbone<small>extracts features</small></div><span class="a">→</span><div class="glass s">Neck<small>FPN / PAN, mixes scales</small></div><span class="a">→</span><div class="glass s">3 heads<small>strides 8, 16, 32</small></div><span class="a">→</span><div class="glass s">Filter + NMS</div></div>
+<div class="glass card" style="margin-top:14px"><table><tr><th>Head</th><th>Grid for 640 input</th><th>Best for</th></tr>
+<tr><td>Stride 8</td><td>80 × 80 = 6,400 predictions</td><td>Small objects</td></tr>
+<tr><td>Stride 16</td><td>40 × 40 = 1,600</td><td>Medium objects</td></tr>
+<tr><td>Stride 32</td><td>20 × 20 = 400</td><td>Large objects</td></tr>
+<tr><td><b>Total</b></td><td><b>8,400 candidate boxes</b> (anchor-free, YOLOv8 style)</td><td>Then filtered by confidence + NMS</td></tr></table></div>
+<div class="grid"><div class="glass card"><h3>Anchor-based (v2 to v5)</h3><div class="f">bx = σ(tx) + cx    by = σ(ty) + cy
+bw = pw·e^tw       bh = ph·e^th</div><p class="sm mut">Predicts offsets from preset anchor shapes (found with k-means on your boxes).</p></div>
+<div class="glass card"><h3>Anchor-free, decoupled head (v8+)</h3><p class="sm">Predicts box distances directly, with separate branches for <b>box</b> and <b>class</b>. No anchor tuning, simpler and often more accurate.</p></div>
+<div class="glass card"><h3>Loss</h3><p class="sm">Box loss (IoU-based, e.g. CIoU) + objectness/class loss. v1 used squared error with extra weight on coordinates.</p></div></div></section>
+
+<section id="evo"><div class="eb">Timeline</div><h2>How YOLO evolved</h2>
+<p class="mut">Click a version.</p><div class="glass card"><div id="vb"></div><h3 id="vh" style="margin-top:10px"></h3><p id="vp"></p></div>
+<p class="sm mut">Later releases come from different teams, so naming is not one official line. Check each model's source and license (including commercial terms) in its docs.</p></section>
+
+<section id="train"><div class="eb">In practice</div><h2>Data, sizes and tuning</h2>
+<div class="grid">
+<div class="glass card"><h3>Label format</h3><div class="f">class  xc    yc    w     h
+0      0.512 0.430 0.210 0.380</div><p class="sm mut">One .txt per image, one line per object, all values normalized 0 to 1.</p><div class="f">dataset/
+ images/train  images/val
+ labels/train  labels/val
+ data.yaml  (paths + names)</div></div>
+<div class="glass card"><h3>Model sizes (YOLOv8, approx.)</h3><div id="sz"></div><p class="sm mut">Parameters (M, gray) and COCO mAP50-95 (black). Figures follow the Ultralytics docs; check the current page for exact numbers and newer models.</p></div>
+<div class="glass card"><h3>Settings that matter</h3><ul class="l sm"><li><code>conf</code>: lower = more boxes, more false alarms</li><li><code>iou</code>: NMS overlap threshold</li><li><code>imgsz</code>: larger helps small objects, slower</li><li><code>epochs</code>, <code>batch</code></li></ul></div></div>
+<div class="glass card" style="margin-top:14px"><h3>Tips for good results</h3><ul class="l sm"><li>Data quality beats model size: consistent labels, varied light, angles and backgrounds.</li><li>Add background images (no objects) to cut false positives.</li><li>Start from pretrained weights and fine-tune.</li><li>Read the confusion matrix and failure cases, not only mAP.</li><li>On edge devices, export (ONNX and others), pick n or s, shrink <code>imgsz</code>, and measure real FPS on the device.</li></ul></div></section>
+
+<section id="code"><div class="eb">Examples</div><h2>Run it with Ultralytics</h2>
+<div class="glass card"><div id="tb"></div><pre id="cd"></pre><p class="sm mut">Install: <code>pip install ultralytics</code>. <code>yolov8n.pt</code> is a small pretrained COCO model; swap in the newest name from the docs.</p></div></section>
+
+<section id="qa"><div class="eb">Revise</div><h2>Self-check</h2>
+<details><summary>Why is YOLO fast?</summary>One network pass predicts boxes and classes together. There is no separate region-proposal step.</details>
+<details><summary>What is the YOLOv1 output tensor?</summary>S × S × (B·5 + C); with S=7, B=2, C=20 that is 7 × 7 × 30.</details>
+<details><summary>What is the confidence score made of?</summary>Pr(object) × IoU(prediction, truth). Multiply by the class probability for the class-specific score.</details>
+<details><summary>Why three detection scales?</summary>Small, medium and large objects appear best on feature maps of different resolution (strides 8, 16, 32).</details>
+<details><summary>Anchor-based vs anchor-free?</summary>Anchor-based predicts offsets from preset shapes; anchor-free predicts boxes directly, with less tuning.</details>
+<details><summary>What do conf and NMS iou change?</summary>conf drops weak boxes; NMS iou decides how much overlap is tolerated before a box is removed as a duplicate.</details>
+<details><summary>Common mistakes</summary>Pixel values instead of normalized labels; class IDs not matching data.yaml; testing on training images; extreme conf values; ignoring the license.</details></section>
+
+<section id="ref"><div class="eb">Go deeper</div><h2>References</h2>
+<div class="grid"><div class="glass card"><h3>Papers</h3><ul class="l sm">
+<li><a href="https://arxiv.org/abs/1506.02640" target="_blank" rel="noopener">YOLO (v1)</a></li>
+<li><a href="https://arxiv.org/abs/1612.08242" target="_blank" rel="noopener">YOLO9000 (v2)</a></li>
+<li><a href="https://arxiv.org/abs/1804.02767" target="_blank" rel="noopener">YOLOv3</a></li>
+<li><a href="https://arxiv.org/abs/2004.10934" target="_blank" rel="noopener">YOLOv4</a></li></ul></div>
+<div class="glass card"><h3>Docs and data</h3><ul class="l sm">
+<li><a href="https://docs.ultralytics.com" target="_blank" rel="noopener">Ultralytics docs</a></li>
+<li><a href="https://github.com/ultralytics/ultralytics" target="_blank" rel="noopener">Ultralytics on GitHub</a></li>
+<li><a href="https://docs.ultralytics.com/datasets/detect/coco" target="_blank" rel="noopener">COCO dataset page</a></li>
+<li><a href="https://cocodataset.org" target="_blank" rel="noopener">cocodataset.org</a></li></ul></div></div></section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+function grid(){const S=+$("#gs").value,x=+$("#gx").value,y=+$("#gy").value,c=300/S,r=Math.floor(y/c),k=Math.floor(x/c);$("#gsv").textContent=S;let h="";
+h+=`<rect x="${k*c}" y="${r*c}" width="${c}" height="${c}" fill="rgba(0,113,227,.22)"/>`;
+for(let i=0;i<=S;i++)h+=`<path d="M${i*c} 0V300M0 ${i*c}H300" stroke="#c9c9ce"/>`;
+h+=`<rect x="${x-45}" y="${y-35}" width="90" height="70" rx="6" fill="rgba(255,159,10,.18)" stroke="#e8920b" stroke-width="2.5"/><circle cx="${x}" cy="${y}" r="5" fill="#111"/>`;
+$("#gv").innerHTML=h;$("#gt").innerHTML=`Responsible cell: <b>row ${r}, column ${k}</b><br>Output tensor with B=2, C=20: <b>${S} × ${S} × 30</b> = ${S*S*30} numbers`}
+["#gs","#gx","#gy"].forEach(s=>$(s).oninput=grid);grid();
+const B=[[60,40,100,100,.95],[70,48,100,98,.88],[52,36,104,106,.80],[200,70,80,90,.90],[206,76,78,88,.62],[20,140,40,40,.20]];
+function iou(a,b){const w=Math.max(0,Math.min(a[0]+a[2],b[0]+b[2])-Math.max(a[0],b[0])),h=Math.max(0,Math.min(a[1]+a[3],b[1]+b[3])-Math.max(a[1],b[1])),i=w*h;return i/(a[2]*a[3]+b[2]*b[3]-i)}
+function nms(){const t=$("#nc").value/100,u=$("#ni").value/100;$("#ncv").textContent=t.toFixed(2);$("#niv").textContent=u.toFixed(2);
+const hi=B.filter(b=>b[4]>=t).sort((a,b)=>b[4]-a[4]),keep=[],drop=[];
+for(const b of hi)(keep.some(k=>iou(k,b)>u)?drop:keep).push(b);
+const lo=B.filter(b=>b[4]<t);let h="";
+for(const b of lo)h+=`<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" fill="none" stroke="#9a9aa0" stroke-dasharray="1 4" stroke-width="2"/>`;
+for(const b of drop)h+=`<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" fill="none" stroke="#d64545" stroke-dasharray="6 4" stroke-width="1.6"/>`;
+for(const b of keep)h+=`<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" fill="rgba(0,0,0,.04)" stroke="#111" stroke-width="2.4"/><text x="${b[0]+4}" y="${b[1]+14}" font-size="12" font-weight="600">${b[4].toFixed(2)}</text>`;
+$("#nv").innerHTML=h;$("#nt").innerHTML=`<b>${B.length}</b> raw boxes → <b>${lo.length}</b> below threshold → <b>${drop.length}</b> removed by NMS → <b>${keep.length}</b> final`}
+$("#nc").oninput=$("#ni").oninput=nms;nms();
+const V=[["v1","2016","Grid S×S, each cell predicts boxes and one class by direct regression. About 45 FPS in the paper. Weak on small objects in groups."],
+["v2","2016–17","Anchor boxes (sizes from k-means), batch normalization, higher-resolution input, multi-scale training. Also the YOLO9000 idea of training on many classes."],
+["v3","2018","Stronger Darknet-53 backbone and predictions at three scales, with independent logistic classifiers for multi-label classes."],
+["v4","2020","Training tricks (mosaic augmentation, better losses, CSP backbone) to raise accuracy at the same speed."],
+["v5","2020","PyTorch implementation by Ultralytics: easy training, deployment and export. Made YOLO accessible to everyone."],
+["v6 / v7","2022","Other research groups pushing speed and accuracy, especially for industrial and edge use."],
+["v8","2023","Anchor-free, decoupled head, n/s/m/l/x sizes, one package for detection, segmentation, pose and tracking."],
+["v9 and later","2024+","Continued releases from several teams: better feature design, and some (like v10) train to avoid NMS. Read the docs for the current best name."]];
+V.forEach((v,i)=>{const b=document.createElement("button");b.textContent=v[0];b.onclick=()=>{$("#vh").textContent=v[0]+" · "+v[1];$("#vp").textContent=v[2];[...$("#vb").children].forEach(x=>x.classList.toggle("on",x===b))};$("#vb").appendChild(b);if(i==6)b.click()});
+[["n",3.2,37.3],["s",11.2,44.9],["m",25.9,50.2],["l",43.7,52.9],["x",68.2,53.9]].forEach(m=>$("#sz").innerHTML+=`<div class="bar"><b>${m[0]}</b><i class="l" style="width:${m[1]*2}px"></i><span>${m[1]}M</span></div><div class="bar"><b></b><i style="width:${m[2]*3}px"></i><span>${m[2]}</span></div>`);
+const C={"Inference":`from ultralytics import YOLO
+
+model = YOLO("yolov8n.pt")
+results = model("street.jpg", conf=0.25, iou=0.5)
+
+for r in results:
+    for b in r.boxes:
+        print(model.names[int(b.cls[0])],
+              round(float(b.conf[0]), 2), b.xyxy[0].tolist())
+results[0].save("out.jpg")`,
+"Train":`# data.yaml
+# path: dataset
+# train: images/train
+# val: images/val
+# names: {0: person, 1: helmet}
+
+model = YOLO("yolov8n.pt")
+model.train(data="data.yaml", epochs=50, imgsz=640)
+metrics = model.val()                 # mAP, precision, recall`,
+"Export":`model = YOLO("runs/detect/train/weights/best.pt")
+model.export(format="onnx")           # other formats exist, check the docs
+
+# CLI equivalents
+# yolo detect train data=data.yaml model=yolov8n.pt epochs=50 imgsz=640
+# yolo detect predict model=best.pt source=0   # webcam`,
+"Webcam + track":`import cv2
+from ultralytics import YOLO
+
+model = YOLO("yolov8n.pt")
+cap = cv2.VideoCapture(0)
+while True:
+    ok, frame = cap.read()
+    if not ok: break
+    out = model.track(frame, persist=True, verbose=False)[0]   # tracking IDs
+    cv2.imshow("YOLO", out.plot())
+    if cv2.waitKey(1) & 0xFF == ord("q"): break
+cap.release(); cv2.destroyAllWindows()`,
+"IoU + NMS from scratch":`def iou(a, b):                      # (x1, y1, x2, y2)
+    x1, y1 = max(a[0], b[0]), max(a[1], b[1])
+    x2, y2 = min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0, x2 - x1) * max(0, y2 - y1)
+    union = (a[2]-a[0])*(a[3]-a[1]) + (b[2]-b[0])*(b[3]-b[1]) - inter
+    return inter / union if union else 0
+
+def nms(boxes, scores, thr=0.5):
+    order = sorted(range(len(boxes)), key=lambda i: -scores[i])
+    keep = []
+    for i in order:
+        if all(iou(boxes[i], boxes[j]) <= thr for j in keep):
+            keep.append(i)
+    return keep`};
+Object.keys(C).forEach((k,i)=>{const b=document.createElement("button");b.textContent=k;b.onclick=()=>{$("#cd").textContent=C[k];[...$("#tb").children].forEach(x=>x.classList.toggle("on",x===b))};$("#tb").appendChild(b);if(!i)b.click()});
+</script></body></html>
