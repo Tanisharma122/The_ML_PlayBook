@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSD: a complete visual guide</title>
+<style>
+:root{--ink:#111;--mut:#6e6e73;--g:rgba(255,255,255,.62);--line:rgba(0,0,0,.09)}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:#f5f5f7;font:16px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(620px 420px at 8% 5%,#d9e6ff,transparent 60%),radial-gradient(520px 440px at 92% 14%,#ffe2ea,transparent 60%),radial-gradient(640px 520px at 55% 98%,#def5e6,transparent 60%)}
+.glass{background:var(--g);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);border:1px solid rgba(255,255,255,.75);box-shadow:0 10px 34px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.85);border-radius:22px}
+main{max-width:1000px;margin:auto;padding:0 20px 70px}section{margin-top:62px}
+h1{font-size:clamp(2.6rem,8vw,5rem);letter-spacing:-.04em;line-height:1;margin:0 0 14px;font-weight:700}
+h2{font-size:clamp(1.55rem,4vw,2.1rem);letter-spacing:-.03em;margin:0 0 6px;font-weight:700}
+h3{font-size:1.02rem;margin:0 0 4px}p{margin:.4em 0;max-width:70ch}.mut{color:var(--mut)}.sm{font-size:.88rem}
+.eb{font-size:.85rem;color:var(--mut);margin-bottom:4px}
+nav{position:sticky;top:12px;z-index:9;max-width:700px;margin:12px auto 0;padding:8px 18px;overflow-x:auto;white-space:nowrap;border-radius:999px}
+nav a{color:var(--ink);text-decoration:none;font-size:.86rem;margin:0 9px;opacity:.6}nav a:hover{opacity:1}
+.hero{padding:66px 0 0;text-align:center}.hero p{margin:0 auto 16px;font-size:1.12rem;color:var(--mut)}
+.pill{display:inline-block;padding:5px 14px;border-radius:999px;font-size:.8rem;background:rgba(255,255,255,.7);border:1px solid var(--line);margin:3px}
+.card{padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-top:14px}
+.row{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+button{font:inherit;font-size:.86rem;border:1px solid var(--line);background:rgba(255,255,255,.8);color:var(--ink);padding:6px 13px;border-radius:999px;cursor:pointer;margin:3px 3px 3px 0}
+button:hover{background:#fff}button.on{background:#111;color:#fff;border-color:#111}
+button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid #0071e3;outline-offset:2px}
+input[type=range]{accent-color:#111;width:160px;vertical-align:middle}
+code,pre{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}code{font-size:.88em}
+pre{margin:10px 0 0;background:#111;color:#f2f2f7;padding:15px;border-radius:14px;overflow-x:auto;font-size:.8rem;line-height:1.55}
+.f{font-family:ui-monospace,Menlo,monospace;background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:8px 0;font-size:.88rem;overflow-x:auto;white-space:pre}
+svg{max-width:100%;height:auto;border-radius:14px;background:rgba(255,255,255,.7);border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:8px 11px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-weight:500}
+details{background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:12px;padding:9px 14px;margin:7px 0}summary{cursor:pointer;font-weight:600}
+ul.l{padding-left:18px;margin:6px 0}ul.l li{margin:5px 0}a{color:#0071e3}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}.flow .s{padding:11px 15px;text-align:center;min-width:110px;font-size:.9rem}.flow small{display:block;color:var(--mut);font-size:.72rem}.flow .a{color:var(--mut);font-size:1.2rem}
+.bar{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:.85rem}.bar b{width:62px;flex:none}.bar i{display:block;height:16px;border-radius:5px;background:#111;min-width:3px}
+</style></head><body>
+<nav class="glass"><a href="#idea">The idea</a><a href="#maps">Feature maps</a><a href="#match">Matching</a><a href="#loss">Loss</a><a href="#cmp">Compare</a><a href="#code">Code</a><a href="#qa">Self-check</a><a href="#ref">Links</a></nav>
+<main>
+<header class="hero"><div class="eb">Computer Vision · Detectors</div><h1>SSD</h1>
+<p>Single Shot MultiBox Detector. One pass, many scales: small objects from big feature maps, large objects from small ones.</p>
+<span class="pill">One-stage</span><span class="pill">Multi-scale</span><span class="pill">Default boxes</span><span class="pill">Hard negative mining</span><span class="pill">Mobile-friendly</span></header>
+
+<section id="idea"><div class="eb">Big picture</div><h2>Detect at every scale, in one shot</h2>
+<p class="mut">Like YOLO, SSD skips region proposals. Its key twist: it attaches detectors to <b>several feature maps of different sizes</b>, so each map specializes in objects of a matching size.</p>
+<div class="flow"><div class="glass s">Image<small>300 × 300</small></div><span class="a">→</span><div class="glass s">Base network<small>VGG-16, truncated</small></div><span class="a">→</span><div class="glass s">Extra conv layers<small>shrinking maps</small></div><span class="a">→</span><div class="glass s">Predictors on 6 maps<small>small 3×3 convs</small></div><span class="a">→</span><div class="glass s">Merge + NMS</div><span class="a">→</span><div class="glass s">Detections</div></div>
+<div class="grid"><div class="glass card"><h3>Early, large maps</h3><p class="sm">Fine detail, high resolution. Good for <b>small</b> objects.</p></div><div class="glass card"><h3>Deep, small maps</h3><p class="sm">Coarse but rich in meaning. Good for <b>large</b> objects.</p></div><div class="glass card"><h3>Single shot</h3><p class="sm">Everything is predicted in one forward pass, so it is fast.</p></div></div></section>
+
+<section id="maps"><div class="eb">Demo 1</div><h2>Six feature maps, six scales</h2>
+<p class="mut">Pick a map. The blue cell is one grid location; the boxes are the <b>default boxes</b> (anchors) placed there. Notice how box size grows as the map shrinks.</p>
+<div class="glass card row" style="margin-top:12px"><div><div id="mb"></div><svg id="mv" viewBox="0 0 300 300" width="330"></svg></div>
+<div style="flex:1;min-width:250px"><p id="mt" class="sm"></p>
+<div class="f">scale  s_k = s_min + (s_max − s_min)/(m − 1) · (k − 1)
+       s_min = 0.2,  s_max = 0.9,  m = 6
+box    w = s_k·√a      h = s_k / √a
+ratios a ∈ {1, 2, 1/2, 3, 1/3}  + one extra box
+       of scale √(s_k · s_k+1)</div>
+<p class="sm mut">Implementations may tweak the scales (for example a smaller first scale), so treat the numbers as the paper's design.</p>
+<div id="bt"></div></div></div></section>
+
+<section id="match"><div class="eb">Demo 2</div><h2>Matching and hard negative mining</h2>
+<p class="mut">The 8,732 default boxes must be matched to real objects before training. This demo uses 600 boxes (10×10 positions, 2 scales, 3 ratios). The dashed box is the ground truth; green boxes are matched (<b>positives</b>).</p>
+<div class="glass card row" style="margin-top:12px"><svg id="sv" viewBox="0 0 300 300" width="330"></svg>
+<div style="flex:1;min-width:250px"><p><label>Match IoU ≥ <input type="range" id="mt2" min="30" max="80" value="50"> <b id="mtv"></b></label></p>
+<p><label>Truth x <input type="range" id="mx" min="10" max="170" value="90"></label></p><p><label>Truth y <input type="range" id="my" min="10" max="160" value="70"></label></p>
+<p id="mo" class="sm"></p>
+<div class="f">match rules
+1. best-IoU default box for each truth box
+2. + any default box with IoU > 0.5
+everything else = background</div></div></div></section>
+
+<section id="loss"><div class="eb">Math</div><h2>Loss, and why negatives need mining</h2>
+<div class="grid"><div class="glass card"><h3>Multibox loss</h3><div class="f">L = (1/N) · ( L_conf + α · L_loc )</div><ul class="l sm"><li><b>L_conf</b>: softmax over C + 1 classes (the +1 is background)</li><li><b>L_loc</b>: Smooth L1 on the 4 box offsets, positives only</li><li><b>N</b>: number of matched boxes, <b>α</b>: balance weight (1 in the paper)</li></ul></div>
+<div class="glass card"><h3>Hard negative mining</h3><p class="sm">Almost every default box is background. Using them all would drown the few positives. SSD sorts negatives by loss and keeps only the <b>hardest</b>, at about <b>3 negatives per positive</b> (see the counts in Demo 2).</p></div>
+<div class="glass card"><h3>Data augmentation</h3><p class="sm">Random crops, flips, zoom-in and zoom-out, and color changes. Zoom-out creates small training objects, which boosted accuracy on small objects.</p></div></div>
+<div class="flow"><div class="glass s">~8,700 boxes<small>scores + offsets</small></div><span class="a">→</span><div class="glass s">Drop low confidence</div><span class="a">→</span><div class="glass s">Decode offsets</div><span class="a">→</span><div class="glass s">NMS per class</div><span class="a">→</span><div class="glass s">Final detections</div></div></section>
+
+<section id="cmp"><div class="eb">Context</div><h2>How good is it, and how does it compare?</h2>
+<p class="mut">In the original paper, SSD300 reached about 74% mAP at about 59 FPS on Pascal VOC 2007, and SSD512 about 77% mAP. For its time that matched Faster R-CNN's accuracy at a much higher speed (results depend on the paper's hardware and setup).</p>
+<div class="glass card" style="margin-top:12px"><table><tr><th></th><th>SSD</th><th>YOLO</th><th>Faster R-CNN</th></tr>
+<tr><td>Type</td><td>One-stage</td><td>One-stage</td><td>Two-stage</td></tr>
+<tr><td>Multi-scale</td><td><b>By design</b>, multiple maps</td><td>From v3 onward</td><td>Via FPN</td></tr>
+<tr><td>Anchors</td><td>Default boxes</td><td>v2 to v5; anchor-free v8+</td><td>RPN anchors</td></tr>
+<tr><td>Speed</td><td>Fast</td><td>Fast</td><td>Slower</td></tr>
+<tr><td>Weak spot</td><td>Small objects (early maps carry weak meaning)</td><td>Older versions: tiny crowded objects</td><td>Speed, heavy</td></tr></table></div>
+<div class="grid"><div class="glass card"><h3>MobileNet-SSD</h3><p class="sm">Swaps the heavy VGG-16 for MobileNet, so SSD runs on phones and small boards.</p></div><div class="glass card"><h3>SSDLite</h3><p class="sm">Replaces regular convs in the prediction layers with cheaper depthwise-separable ones for even lower cost.</p></div><div class="glass card"><h3>Strengths and limits</h3><p class="sm">Fast, simple, multi-scale. Sensitive to default box design, many boxes to balance, and still tricky for tiny objects.</p></div></div></section>
+
+<section id="code"><div class="eb">Examples</div><h2>Run it with torchvision</h2>
+<div class="glass card"><div id="tb"></div><pre id="cd"></pre><p class="sm mut">Install: <code>pip install torch torchvision</code>. Torchvision also has <code>ssd300_vgg16</code>, the original-style SSD.</p></div></section>
+
+<section id="qa"><div class="eb">Revise</div><h2>Self-check</h2>
+<details><summary>What does "single shot" mean?</summary>Boxes and classes are predicted in one network pass, with no separate region-proposal stage.</details>
+<details><summary>Why multiple feature maps?</summary>Each map has a different resolution, so it suits a different object size: large maps for small objects, small maps for large objects.</details>
+<details><summary>What are default boxes?</summary>Preset boxes of several scales and aspect ratios at every map location. The network predicts class scores and 4 offsets for each.</details>
+<details><summary>Why C + 1 classes?</summary>The extra class is background, needed because most default boxes contain no object.</details>
+<details><summary>How are positives chosen?</summary>The best-IoU default box for each truth box, plus every default box with IoU above 0.5.</details>
+<details><summary>Why hard negative mining?</summary>Negatives vastly outnumber positives. Keeping only the highest-loss negatives (about 3 per positive) balances training.</details>
+<details><summary>How many default boxes does SSD300 have?</summary>8,732 = 38²·4 + 19²·6 + 10²·6 + 5²·6 + 3²·4 + 1²·4.</details>
+<details><summary>Common mistakes</summary>Forgetting the background class; drawing boxes without scaling back to the original image size; poorly matched default box scales for your objects; expecting top accuracy on very small objects.</details></section>
+
+<section id="ref"><div class="eb">Go deeper</div><h2>References</h2>
+<div class="grid"><div class="glass card"><h3>Paper</h3><ul class="l sm"><li><a href="https://arxiv.org/abs/1512.02325" target="_blank" rel="noopener">SSD: Single Shot MultiBox Detector</a></li></ul></div>
+<div class="glass card"><h3>Practice</h3><ul class="l sm"><li><a href="https://pytorch.org/vision/stable/models.html" target="_blank" rel="noopener">Torchvision models</a> (object detection)</li><li><a href="https://docs.voxel51.com/getting_started/object_detection/index.html" target="_blank" rel="noopener">FiftyOne detection guide</a></li><li><a href="https://cocodataset.org" target="_blank" rel="noopener">COCO dataset</a></li></ul></div></div></section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const M=[38,19,10,5,3,1],BP=[4,6,6,6,4,4],SK=[.2,.34,.48,.62,.76,.9],T=M.map((m,i)=>m*m*BP[i]);
+M.forEach((m,k)=>{const b=document.createElement("button");b.textContent=m+"×"+m;b.onclick=()=>maps(k);$("#mb").appendChild(b)});
+function maps(k){[...$("#mb").children].forEach((b,i)=>b.classList.toggle("on",i===k));const S=M[k],c=300/S,mid=Math.floor(S/2),cx=(mid+.5)*c,cy=cx;let h="";
+h+=`<rect x="${mid*c}" y="${mid*c}" width="${c}" height="${c}" fill="rgba(0,113,227,.3)"/>`;
+if(S>1)for(let i=0;i<=S;i++)h+=`<path d="M${i*c} 0V300M0 ${i*c}H300" stroke="#c9c9ce" stroke-width="${S>19?.4:1}"/>`;
+const s=SK[k],s2=Math.sqrt(s*(SK[k+1]||1)),R=BP[k]==6?[1,2,.5,3,1/3]:[1,2,.5],col=["#111","#e8920b","#1a9e55","#d64545","#7a4bd1"];
+R.forEach((a,i)=>{const w=s*300*Math.sqrt(a),hh=s*300/Math.sqrt(a);h+=`<rect x="${cx-w/2}" y="${cy-hh/2}" width="${w}" height="${hh}" fill="none" stroke="${col[i]}" stroke-width="1.8"/>`});
+h+=`<rect x="${cx-s2*150}" y="${cy-s2*150}" width="${s2*300}" height="${s2*300}" fill="none" stroke="#0071e3" stroke-dasharray="5 3" stroke-width="1.8"/>`;
+$("#mv").innerHTML=h;$("#mt").innerHTML=`<b>${S}×${S}</b> map · <b>${BP[k]}</b> default boxes per position · <b>${T[k].toLocaleString()}</b> boxes on this map<br>Scale s<sub>k</sub> = ${s} → about <b>${Math.round(s*300)} px</b> on a 300 px input<br><span class="mut">Solid = aspect ratios, dashed blue = the extra box</span>`;
+$("#bt").innerHTML=`<p class="sm"><b>Boxes per map</b> (total ${T.reduce((a,b)=>a+b).toLocaleString()})</p>`+T.map((t,i)=>`<div class="bar"><b>${M[i]}×${M[i]}</b><i style="width:${t/T[0]*60}%;${i==k?"":"opacity:.35"}"></i><span>${t.toLocaleString()}</span></div>`).join("")}
+maps(0);
+function iou(a,b){const w=Math.max(0,Math.min(a[0]+a[2],b[0]+b[2])-Math.max(a[0],b[0])),h=Math.max(0,Math.min(a[1]+a[3],b[1]+b[3])-Math.max(a[1],b[1])),i=w*h;return i/(a[2]*a[3]+b[2]*b[3]-i)}
+const DB=[];for(let i=0;i<10;i++)for(let j=0;j<10;j++)for(const s of[75,150])for(const a of[1,2,.5]){const w=s*Math.sqrt(a),h=s/Math.sqrt(a),cx=(i+.5)*30,cy=(j+.5)*30;DB.push([cx-w/2,cy-h/2,w,h])}
+function match(){const t=$("#mt2").value/100;$("#mtv").textContent=t.toFixed(2);const G=[+$("#mx").value,+$("#my").value,110,120],I=DB.map(b=>iou(b,G));let best=0;I.forEach((v,i)=>{if(v>I[best])best=i});
+const P=I.map((v,i)=>i).filter(i=>I[i]>=t||i===best).sort((a,b)=>I[b]-I[a]),n=DB.length-P.length,use=Math.min(n,3*P.length);
+let h=`<rect x="${G[0]}" y="${G[1]}" width="${G[2]}" height="${G[3]}" fill="rgba(0,0,0,.05)" stroke="#111" stroke-width="2.4" stroke-dasharray="7 4"/>`;
+P.slice(0,40).forEach(i=>{const b=DB[i];h+=`<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" fill="none" stroke="${i===best?"#d64545":"#1a9e55"}" stroke-width="${i===best?2.6:1}" opacity="${i===best?1:.6}"/>`});
+$("#sv").innerHTML=h;$("#mo").innerHTML=`<b style="color:#1a9e55">${P.length} positives</b> (red = best match, always kept)<br><b>${n}</b> negatives → mining keeps the hardest <b>${use}</b> (3 : 1)<br><span class="mut">Showing up to 40 positives. Lower the IoU and more boxes match.</span>`}
+["#mt2","#mx","#my"].forEach(s=>$(s).oninput=match);match();
+const C={"Inference":`import torch
+from torchvision.io import read_image
+from torchvision.models.detection import (
+    ssdlite320_mobilenet_v3_large, SSDLite320_MobileNet_V3_Large_Weights)
+
+w = SSDLite320_MobileNet_V3_Large_Weights.DEFAULT
+model = ssdlite320_mobilenet_v3_large(weights=w).eval()
+prep = w.transforms()
+
+img = read_image("street.jpg")                  # tensor C x H x W
+with torch.no_grad():
+    out = model([prep(img)])[0]                  # boxes (xyxy), labels, scores
+
+keep = out["scores"] > 0.5
+names = [w.meta["categories"][i] for i in out["labels"][keep]]
+print(names, out["boxes"][keep])`,
+"Draw boxes":`import cv2
+im = cv2.imread("street.jpg")
+for (x1, y1, x2, y2), name in zip(out["boxes"][keep].int().tolist(), names):
+    cv2.rectangle(im, (x1, y1), (x2, y2), (0, 255, 0), 2)
+    cv2.putText(im, name, (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, .6, (0, 255, 0), 2)
+cv2.imwrite("ssd_out.jpg", im)
+# boxes match the (possibly resized) input the model saw;
+# scale them back before drawing on the original image`,
+"Default box count":`maps = [38, 19, 10, 5, 3, 1]
+per  = [4, 6, 6, 6, 4, 4]
+print(sum(m * m * p for m, p in zip(maps, per)))     # 8732
+
+s_min, s_max, m = 0.2, 0.9, 6
+scales = [s_min + (s_max - s_min) / (m - 1) * k for k in range(m)]
+print([round(s * 300) for s in scales])              # box size in px on a 300 px input`};
+Object.keys(C).forEach((k,i)=>{const b=document.createElement("button");b.textContent=k;b.onclick=()=>{$("#cd").textContent=C[k];[...$("#tb").children].forEach(x=>x.classList.toggle("on",x===b))};$("#tb").appendChild(b);if(!i)b.click()});
+</script></body></html>
