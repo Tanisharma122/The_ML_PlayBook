@@ -75,6 +75,7 @@ Comprehensive modules spanning foundational image processing to state-of-the-art
 #### 🔬 In-Depth Computer Vision Research & Advanced Notes
 - [📖 Faster R-CNN Deep Dive Notes](Computer%20Vision/faster_rcnn_study_notes.md) — Comprehensive mathematical walkthrough, RPN loss breakdown, and anchor regression mechanics.
 - [📖 Image Segmentation Comprehensive Guide](Computer%20Vision/image_segmentation_study_notes.md) — Encoder-decoder backbones, Dice & Focal loss formulation, transpose convolutions vs bilinear upsampling.
+- [📖 OCR Practical Guide](Computer%20Vision/OCR.md) — Practical guide to Tesseract, EasyOCR, PaddleOCR, cloud APIs, and document extraction.
 - [📖 Optical Character Recognition (OCR) Notes](Computer%20Vision/ocr_study_notes.md) — Text detection (EAST/DBNet) + recognition (CRNN + CTC loss), integration with Tesseract & EasyOCR pipelines.
 
 ---
@@ -148,6 +149,7 @@ The_ML_PlayBook/
 │   ├── 📄 07_image_segmentation.md
 │   ├── 📄 faster_rcnn_study_notes.md
 │   ├── 📄 image_segmentation_study_notes.md
+│   ├── 📄 OCR.md
 │   └── 📄 ocr_study_notes.md
 │
 ├── 📁 Large Language Models/
