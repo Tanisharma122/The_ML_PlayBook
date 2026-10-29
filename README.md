@@ -71,6 +71,7 @@ Comprehensive modules spanning foundational image processing to state-of-the-art
 | **05** | **SSD (Single Shot MultiBox)** | [05_ssd.md](Computer%20Vision/05_ssd.md) | [05_ssd.html](Computer%20Vision/05_ssd.html) | Multi-scale feature maps, pyramidal feature hierarchy, default boxes across aspect ratios, hard negative mining (3:1 ratio). |
 | **06** | **Faster R-CNN** | [06_faster_rcnn.md](Computer%20Vision/06_faster_rcnn/06_faster_rcnn.md) | [06_faster_rcnn.html](Computer%20Vision/06_faster_rcnn/06_faster_rcnn.html) | Two-stage detection architecture, Region Proposal Network (RPN), RoI Pooling vs. RoIAlign, joint multi-task end-to-end training. |
 | **07** | **Image Segmentation** | [07_image_segmentation.md](Computer%20Vision/07_image_segmentation.md) | — | Semantic vs. Instance vs. Panoptic segmentation, Fully Convolutional Networks (FCN), U-Net skip connections, Mask R-CNN mask head. |
+| **08** | **Vision Transformers (ViT)** | [08_vision_transformers.md](Computer%20Vision/08_vision_transformers.md) | — | Patch extraction & linear projection, class token (`[CLS]`), 1D position embeddings, self-attention complexity, inductive bias vs CNNs, DeiT, Swin. |
 
 #### 🔬 In-Depth Computer Vision Research & Advanced Notes
 - [📖 Faster R-CNN Deep Dive Notes](Computer%20Vision/faster_rcnn_study_notes.md) — Comprehensive mathematical walkthrough, RPN loss breakdown, and anchor regression mechanics.
@@ -147,6 +148,7 @@ The_ML_PlayBook/
 │   ├── 📄 05_ssd.md
 │   ├── 🌐 05_ssd.html
 │   ├── 📄 07_image_segmentation.md
+│   ├── 📄 08_vision_transformers.md
 │   ├── 📄 faster_rcnn_study_notes.md
 │   ├── 📄 image_segmentation_study_notes.md
 │   ├── 📄 OCR.md
